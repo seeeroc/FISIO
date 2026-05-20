@@ -348,8 +348,22 @@ if __name__ == "__main__":
 
     if "--demo" in args:
         ejecutar_demos(usar_color)
+    elif "--cli" in args:
+        # Forzar modo CLI
+        args = [a for a in args if a != "--cli"]
+        if args:
+            analizar_archivo(args[0], usar_color)
+        else:
+            menu_interactivo(usar_color)
     elif args:
         # Primer argumento = ruta al archivo
         analizar_archivo(args[0], usar_color)
     else:
-        menu_interactivo(usar_color)
+        # Por defecto, iniciar la interfaz gráfica (GUI)
+        try:
+            import gui
+            gui.main()
+        except ImportError as e:
+            print(f"No se pudo cargar la interfaz gráfica (GUI): {e}")
+            print("Iniciando modo consola interactivo...")
+            menu_interactivo(usar_color)

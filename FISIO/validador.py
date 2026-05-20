@@ -84,6 +84,13 @@ class Validador:
         if not lexema:
             return False, "Número vacío."
 
+        # ── Caso: letras mezcladas con números ────────────────
+        if any(c.isalpha() for c in lexema):
+            return False, (
+                f"Número inválido '{lexema}': "
+                "no se permiten letras mezcladas con números."
+            )
+
         puntos = lexema.count('.')
 
         # ── Caso: múltiples puntos ───────────────────────────

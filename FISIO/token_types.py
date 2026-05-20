@@ -1,30 +1,21 @@
 """
 =============================================================
- FISIO - Analizador Léxico
- Módulo: token_types.py
- Descripción: Definición de tipos de tokens, IDs y categorías
-              del lenguaje FISIO para problemas de física clásica.
- Autor: Analizador Léxico FISIO
+ FISIO - Analizador Léxico  |  token_types.py  v2
+ Definición de tokens, IDs, alfabeto y paleta GUI.
 =============================================================
 """
 
-# ─────────────────────────────────────────────────────────────
-#  CATEGORÍAS DE TOKENS
-# ─────────────────────────────────────────────────────────────
+# ── Categorías ────────────────────────────────────────────────
 class TipoToken:
-    """Enumeración de categorías de tokens del lenguaje FISIO."""
-    PALABRA_RESERVADA  = "PR"
+    PALABRA_RESERVADA   = "PR"
     OPERADOR_MATEMATICO = "OPM"
     OPERADOR_RELACIONAL = "OPR"
-    SIGNO              = "SIG"
-    IDENTIFICADOR      = "ID"
-    NUMERO             = "NUM"
-    ERROR              = "ERROR"
+    SIGNO               = "SIG"
+    IDENTIFICADOR       = "ID"
+    NUMERO              = "NUM"
+    ERROR               = "ERROR"
 
-
-# ─────────────────────────────────────────────────────────────
-#  PALABRAS RESERVADAS  →  (categoría, ID)
-# ─────────────────────────────────────────────────────────────
+# ── Palabras reservadas ───────────────────────────────────────
 PALABRAS_RESERVADAS: dict[str, tuple[str, str]] = {
     "mru"         : (TipoToken.PALABRA_RESERVADA, "PR_01"),
     "mrua"        : (TipoToken.PALABRA_RESERVADA, "PR_02"),
@@ -46,9 +37,7 @@ PALABRAS_RESERVADAS: dict[str, tuple[str, str]] = {
     "alcance"     : (TipoToken.PALABRA_RESERVADA, "PR_18"),
 }
 
-# ─────────────────────────────────────────────────────────────
-#  OPERADORES MATEMÁTICOS  →  (categoría, ID)
-# ─────────────────────────────────────────────────────────────
+# ── Operadores matemáticos ────────────────────────────────────
 OPERADORES_MATEMATICOS: dict[str, tuple[str, str]] = {
     "+" : (TipoToken.OPERADOR_MATEMATICO, "OPM_01"),
     "-" : (TipoToken.OPERADOR_MATEMATICO, "OPM_02"),
@@ -57,11 +46,7 @@ OPERADORES_MATEMATICOS: dict[str, tuple[str, str]] = {
     "^" : (TipoToken.OPERADOR_MATEMATICO, "OPM_05"),
 }
 
-# ─────────────────────────────────────────────────────────────
-#  OPERADORES RELACIONALES / ASIGNACIÓN  →  (categoría, ID)
-#  Nota: los operadores de 2 caracteres deben verificarse ANTES
-#        que los de 1 carácter para el análisis correcto.
-# ─────────────────────────────────────────────────────────────
+# ── Operadores relacionales ───────────────────────────────────
 OPERADORES_RELACIONALES: dict[str, tuple[str, str]] = {
     ":=" : (TipoToken.OPERADOR_RELACIONAL, "OPR_01"),
     "="  : (TipoToken.OPERADOR_RELACIONAL, "OPR_02"),
@@ -72,9 +57,7 @@ OPERADORES_RELACIONALES: dict[str, tuple[str, str]] = {
     "!=" : (TipoToken.OPERADOR_RELACIONAL, "OPR_07"),
 }
 
-# ─────────────────────────────────────────────────────────────
-#  SIGNOS DE AGRUPACIÓN Y PUNTUACIÓN  →  (categoría, ID)
-# ─────────────────────────────────────────────────────────────
+# ── Signos ───────────────────────────────────────────────────
 SIGNOS: dict[str, tuple[str, str]] = {
     "(" : (TipoToken.SIGNO, "SIG_01"),
     ")" : (TipoToken.SIGNO, "SIG_02"),
@@ -85,9 +68,7 @@ SIGNOS: dict[str, tuple[str, str]] = {
     ";" : (TipoToken.SIGNO, "SIG_07"),
 }
 
-# ─────────────────────────────────────────────────────────────
-#  ALFABETO VÁLIDO DEL LENGUAJE FISIO
-# ─────────────────────────────────────────────────────────────
+# ── Alfabeto válido ───────────────────────────────────────────
 ALFABETO_VALIDO: set[str] = set(
     "abcdefghijklmnopqrstuvwxyz"
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -97,3 +78,33 @@ ALFABETO_VALIDO: set[str] = set(
     "()[],.; "
     "\t\n\r"
 )
+
+# ── Paleta de colores GUI (dark – Catppuccin Mocha) ──────────
+COLORES_GUI = {
+    # Fondos
+    "bg_main"    : "#1e1e2e",
+    "bg_editor"  : "#181825",
+    "bg_panel"   : "#24273a",
+    "bg_toolbar" : "#181825",
+    "bg_status"  : "#11111b",
+    "bg_row_alt" : "#2a2a3e",
+    # Texto
+    "fg_main"    : "#cdd6f4",
+    "fg_dim"     : "#6c7086",
+    "fg_lineno"  : "#585b70",
+    # Tipos de token (tabla + editor)
+    "col_PR"     : "#89b4fa",   # azul   — palabras reservadas
+    "col_OPM"    : "#f38ba8",   # rojo   — operadores matemáticos
+    "col_OPR"    : "#fab387",   # naranja— operadores relacionales
+    "col_SIG"    : "#94e2d5",   # cyan   — signos
+    "col_ID"     : "#a6e3a1",   # verde  — identificadores
+    "col_NUM"    : "#f9e2af",   # amarillo — números
+    "col_ERROR"  : "#f38ba8",   # rojo   — errores
+    # Acento
+    "accent"     : "#cba6f7",   # morado
+    "accent2"    : "#89dceb",   # celeste
+    "ok_green"   : "#a6e3a1",
+    "err_red"    : "#f38ba8",
+    # Borde / separador
+    "border"     : "#313244",
+}
