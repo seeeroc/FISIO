@@ -1,0 +1,17 @@
+mru(velocidad := 20, tiempo := 5);
+altura := 150.5;
+caida(gravedad := 9.81);
+mrua(aceleracion := 3, velocidad := 0, tiempo := 10);
+parabolico(alcance := 45, altura := 12.0);
+posicion := velocidad + aceleracion * tiempo ^ 2;
+raiz(posicion);
+seno(angulo);
+coseno(angulo);
+magnitud(velocidad);
+despejar(alcance);
+graficar(posicion);
+simular(velocidad);
+resultado := (posicion + altura) / 2;
+distancia := velocidad * tiempo + 0.5 * aceleracion * tiempo ^ 2;
+velocidadFinal := velocidad + aceleracion * tiempo;
+h := altura - 0.5 * gravedad * tiempo ^ 2;

@@ -1,0 +1,34 @@
+; Archivo de prueba FISIO con errores lexicos intencionales
+; NOTA: En FISIO no hay comentarios. Se usa ; para terminar sentencias.
+
+; ERROR 1 - Simbolo fuera del alfabeto @
+x := 5@2;
+
+; ERROR 2 - Numero que inicia con punto
+a := .5;
+
+; ERROR 3 - Numero que termina con punto
+b := 5.;
+
+; ERROR 4 - Multiples puntos decimales
+c := 1..5;
+
+; ERROR 5 - Ceros a la izquierda
+d := 01;
+e := 001.5;
+
+; ERROR 6 - Numero mezclado con letra
+f := 12a;
+g := 9.8x;
+
+; ERROR 7 - Simbolo fuera del alfabeto #
+h := 3#14;
+
+; ERROR 8 - Operador incompleto solo
+i := 5 ! 3;
+
+; ERROR 9 - Secuencia inicia con digito
+1variable := 10;
+
+; ERROR 10 - Simbolo $ fuera del alfabeto
+precio := 100$;
