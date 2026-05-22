@@ -177,12 +177,12 @@ def test_identificadores_validos():
 
 
 def test_palabra_reservada_despues_de_punto_es_identificador():
-    """Verifica que una PR pegada a punto se clasifique como ID."""
+    """Verifica que una PR pegada a punto se clasifique como un solo ID."""
     _ejecutar(
-        "Palabra reservada despues de punto se reconoce como ID",
-        ".mru .tiempo",
+        "Palabra reservada despues de punto se reconoce como un solo ID",
+        ".mrua .tiempo",
         tokens_esperados=[
-            (".", "SIG_06"), ("mru", "ID"), ("tiempo", "ID"),
+            (".mrua", "ID"), (".tiempo", "ID"),
         ],
     )
 

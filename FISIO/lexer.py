@@ -145,9 +145,14 @@ class Lexer:
                 buf, TipoToken.NUMERO, "NUM", lin_ini, col_ini
             )
         elif sig_pos < len(self.fuente) and self.fuente[sig_pos].isalpha():
-            self._agregar_token_en(".", *SIGNOS["."], lin_ini, col_ini)
+            buf = "."
             self._avanzar()
-            self._leer_palabra(forzar_identificador=True)
+            while not self._fin() and self._actual().isalnum():
+                buf += self._actual()
+                self._avanzar()
+            self._agregar_token_en(
+                buf, TipoToken.IDENTIFICADOR, "ID", lin_ini, col_ini
+            )
         else:
             self._agregar_token_en(".", *SIGNOS["."], lin_ini, col_ini)
             self._avanzar()
