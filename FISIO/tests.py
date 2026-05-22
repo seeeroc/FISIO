@@ -187,6 +187,17 @@ def test_palabra_reservada_despues_de_punto_es_identificador():
     )
 
 
+def test_palabra_reservada_antes_de_punto_es_identificador():
+    """Verifica que una PR pegada antes de punto se clasifique como un solo ID."""
+    _ejecutar(
+        "Palabra reservada antes de punto se reconoce como un solo ID",
+        "mrua. tiempo.",
+        tokens_esperados=[
+            ("mrua.", "ID"), ("tiempo.", "ID"),
+        ],
+    )
+
+
 def test_numeros_enteros_validos():
     """Verifica literales enteros con reglas estrictas."""
     _ejecutar(
@@ -391,6 +402,7 @@ def ejecutar_todas() -> None:
     test_signos()
     test_identificadores_validos()
     test_palabra_reservada_despues_de_punto_es_identificador()
+    test_palabra_reservada_antes_de_punto_es_identificador()
     test_numeros_enteros_validos()
     test_numeros_decimales_validos()
     test_programa_completo_valido()

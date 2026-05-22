@@ -96,6 +96,15 @@ class Lexer:
             )
             return
 
+        if buf in PALABRAS_RESERVADAS and not self._fin() and self._actual() == '.':
+            buf += self._actual()
+            self._avanzar()
+            while not self._fin() and self._actual().isalnum():
+                buf += self._actual()
+                self._avanzar()
+            self._agregar_token_en(buf, TipoToken.IDENTIFICADOR, "ID", lin_ini, col_ini)
+            return
+
         if buf in PALABRAS_RESERVADAS and not forzar_identificador:
             tipo, id_tok = PALABRAS_RESERVADAS[buf]
             self._agregar_token_en(buf, tipo, id_tok, lin_ini, col_ini)
