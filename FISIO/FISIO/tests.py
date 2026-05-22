@@ -176,6 +176,17 @@ def test_identificadores_validos():
     )
 
 
+def test_palabra_reservada_despues_de_punto_es_identificador():
+    """Verifica que una PR pegada a punto se clasifique como ID."""
+    _ejecutar(
+        "Palabra reservada despues de punto se reconoce como ID",
+        ".mru .tiempo",
+        tokens_esperados=[
+            (".", "SIG_06"), ("mru", "ID"), ("tiempo", "ID"),
+        ],
+    )
+
+
 def test_numeros_enteros_validos():
     """Verifica literales enteros con reglas estrictas."""
     _ejecutar(
@@ -379,6 +390,7 @@ def ejecutar_todas() -> None:
     test_operadores_relacionales()
     test_signos()
     test_identificadores_validos()
+    test_palabra_reservada_despues_de_punto_es_identificador()
     test_numeros_enteros_validos()
     test_numeros_decimales_validos()
     test_programa_completo_valido()

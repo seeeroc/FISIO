@@ -79,7 +79,7 @@ class Lexer:
         return self.tokens, self.errores
 
     # ── Leer palabra (PR / ID) ────────────────────────────────
-    def _leer_palabra(self) -> None:
+    def _leer_palabra(self, forzar_identificador: bool = False) -> None:
         col_ini, lin_ini = self.columna, self.linea
         buf = ""
         while not self._fin() and self._actual().isalnum():
@@ -96,7 +96,7 @@ class Lexer:
             )
             return
 
-        if buf in PALABRAS_RESERVADAS:
+        if buf in PALABRAS_RESERVADAS and not forzar_identificador:
             tipo, id_tok = PALABRAS_RESERVADAS[buf]
             self._agregar_token_en(buf, tipo, id_tok, lin_ini, col_ini)
         else:
@@ -144,6 +144,10 @@ class Lexer:
             self._agregar_token_en(
                 buf, TipoToken.NUMERO, "NUM", lin_ini, col_ini
             )
+        elif sig_pos < len(self.fuente) and self.fuente[sig_pos].isalpha():
+            self._agregar_token_en(".", *SIGNOS["."], lin_ini, col_ini)
+            self._avanzar()
+            self._leer_palabra(forzar_identificador=True)
         else:
             self._agregar_token_en(".", *SIGNOS["."], lin_ini, col_ini)
             self._avanzar()
