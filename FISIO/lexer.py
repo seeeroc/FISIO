@@ -23,7 +23,7 @@ class Lexer:
         self.linea   = 1
         self.columna = 1
         self.tokens : list[Token] = []
-        self.errores: list[Token] = []
+        # self.errores: list[Token] = []  # errors disabled
 
     # ── Punto de entrada ─────────────────────────────────────
     def analizar(self) -> tuple[list[Token], list[Token]]:
@@ -181,9 +181,7 @@ class Lexer:
         self.tokens.append(Token(lex, tipo, id_tok, lin, col))
 
     def _registrar_error(self, lex, msg):
-        self.errores.append(
-            Token(lex, TipoToken.ERROR, "ERROR", self.linea, self.columna, msg)
-        )
+        pass
 
     def _registrar_error_en(self, lex, lin, col, msg):
-        self.errores.append(Token(lex, TipoToken.ERROR, "ERROR", lin, col, msg))
+        pass

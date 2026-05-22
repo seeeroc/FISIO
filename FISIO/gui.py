@@ -3,17 +3,27 @@
  FISIO - Analizador Léxico  |  gui.py
  Interfaz gráfica profesional con Tkinter.
  Dark theme (Catppuccin Mocha), resaltado sintáctico,
- tabla de tokens, reporte de errores y estadísticas.
+ tabla de tokens y estadísticas.
 =============================================================
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, font as tkfont
+from tkinter import ttk, filedialog, messagebox
 import os
 import sys
 
 from lexer       import Lexer
-from token_types import TipoToken, PALABRAS_RESERVADAS, COLORES_GUI
+from token_types import TipoToken, PALABRAS_RESERVADAS, COLORES_GUI, ALFABETO_VALIDO
+
+from token_types import (
+    TipoToken,
+    PALABRAS_RESERVADAS,
+    OPERADORES_MATEMATICOS,
+    OPERADORES_RELACIONALES,
+    SIGNOS,
+    COLORES_GUI,
+    ALFABETO_VALIDO
+)
 
 # ─────────────────────────────────────────────────────────────
 #  EJEMPLOS PRECARGADOS
@@ -134,10 +144,6 @@ class EditorCodigo(tk.Frame):
             "SIG"  : {"foreground": C["col_SIG"]},
             "ID"   : {"foreground": C["col_ID"]},
             "NUM"  : {"foreground": C["col_NUM"]},
-            "ERROR": {"foreground": C["col_ERROR"],
-                      "underline": True,
-                      "font": ("Consolas", 12, "italic")},
-            "linea_error": {"background": "#2d1b1b"},
         }
         for nombre, opts in tags.items():
             self.texto.tag_configure(nombre, **opts)
@@ -164,31 +170,15 @@ class EditorCodigo(tk.Frame):
         self.numeros.config(state="disabled")
         self.numeros.yview_moveto(self.texto.yview()[0])
 
-    def resaltar(self, tokens: list, errores: list):
+    def resaltar(self, tokens: list):
         """Aplica tags de color al editor según los tokens encontrados."""
-        # Limpiar todos los tags anteriores
-        for tag in ("PR","OPM","OPR","SIG","ID","NUM","ERROR","linea_error"):
+        for tag in ("PR", "OPM", "OPR", "SIG", "ID", "NUM"):
             self.texto.tag_remove(tag, "1.0", "end")
 
-        # Marcar líneas con error de fondo
-        lineas_error = {e.linea for e in errores}
-        for l in lineas_error:
-            ini = f"{l}.0"
-            fin = f"{l}.end"
-            self.texto.tag_add("linea_error", ini, fin)
-
-        # Colorear tokens
         for tok in tokens:
-            tipo = tok.tipo
-            ini  = f"{tok.linea}.{tok.columna - 1}"
-            fin  = f"{tok.linea}.{tok.columna - 1 + len(tok.lexema)}"
-            self.texto.tag_add(tipo, ini, fin)
-
-        # Subrayar lexemas de error
-        for err in errores:
-            ini = f"{err.linea}.{err.columna - 1}"
-            fin = f"{err.linea}.{err.columna - 1 + len(err.lexema)}"
-            self.texto.tag_add("ERROR", ini, fin)
+            ini = f"{tok.linea}.{tok.columna - 1}"
+            fin = f"{tok.linea}.{tok.columna - 1 + len(tok.lexema)}"
+            self.texto.tag_add(tok.tipo, ini, fin)
 
     def get_codigo(self) -> str:
         return self.texto.get("1.0", "end-1c")
@@ -223,14 +213,13 @@ class TablaTokens(tk.Frame):
         style = ttk.Style()
         style.theme_use("clam")
 
-        # Estilo del Treeview
         style.configure("Tokens.Treeview",
-            background   = C["bg_panel"],
-            foreground   = C["fg_main"],
+            background      = C["bg_panel"],
+            foreground      = C["fg_main"],
             fieldbackground = C["bg_panel"],
-            rowheight    = 24,
-            font         = ("Consolas", 11),
-            borderwidth  = 0,
+            rowheight       = 24,
+            font            = ("Consolas", 11),
+            borderwidth     = 0,
         )
         style.configure("Tokens.Treeview.Heading",
             background  = C["bg_toolbar"],
@@ -240,15 +229,15 @@ class TablaTokens(tk.Frame):
             borderwidth = 0,
         )
         style.map("Tokens.Treeview",
-            background  = [("selected", C["border"])],
-            foreground  = [("selected", C["fg_main"])],
+            background = [("selected", C["border"])],
+            foreground = [("selected", C["fg_main"])],
         )
         style.configure("Vertical.TScrollbar",
-            background = C["bg_toolbar"], troughcolor = C["bg_panel"],
-            arrowcolor = C["fg_dim"],
+            background  = C["bg_toolbar"],
+            troughcolor = C["bg_panel"],
+            arrowcolor  = C["fg_dim"],
         )
 
-        # Frame interno
         frame = tk.Frame(self, bg=C["bg_panel"])
         frame.pack(fill="both", expand=True)
 
@@ -261,23 +250,19 @@ class TablaTokens(tk.Frame):
             self.tree.column(col, width=ancho, minwidth=40, anchor="center")
         self.tree.column("lexema", anchor="w")
 
-        sb = ttk.Scrollbar(frame, orient="vertical",
-                           command=self.tree.yview)
+        sb = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
 
-        sbx = ttk.Scrollbar(frame, orient="horizontal",
-                            command=self.tree.xview)
+        sbx = ttk.Scrollbar(frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(xscrollcommand=sbx.set)
         sbx.pack(side="bottom", fill="x")
 
         self.tree.pack(fill="both", expand=True)
 
-        # Tags de color por tipo
-        C = self.colores
         for tipo, color in [
-            ("PR","col_PR"),("OPM","col_OPM"),("OPR","col_OPR"),
-            ("SIG","col_SIG"),("ID","col_ID"),("NUM","col_NUM"),
+            ("PR", "col_PR"), ("OPM", "col_OPM"), ("OPR", "col_OPR"),
+            ("SIG", "col_SIG"), ("ID", "col_ID"), ("NUM", "col_NUM"),
         ]:
             self.tree.tag_configure(tipo, foreground=C[color])
         self.tree.tag_configure("par",   background=C["bg_row_alt"])
@@ -295,90 +280,6 @@ class TablaTokens(tk.Frame):
 
     def limpiar(self):
         self.tree.delete(*self.tree.get_children())
-
-
-# ─────────────────────────────────────────────────────────────
-#  WIDGET: PANEL DE ERRORES
-# ─────────────────────────────────────────────────────────────
-class PanelErrores(tk.Frame):
-    """Muestra errores léxicos con formato detallado."""
-
-    def __init__(self, parent, colores: dict, **kwargs):
-        super().__init__(parent, bg=colores["bg_panel"], **kwargs)
-        self.colores = colores
-        self._construir()
-
-    def _construir(self):
-        C = self.colores
-        mono = ("Consolas", 11)
-
-        sb = ttk.Scrollbar(self, orient="vertical")
-        sb.pack(side="right", fill="y")
-
-        self.txt = tk.Text(
-            self, state="disabled", wrap="word",
-            bg=C["bg_panel"], fg=C["fg_main"],
-            font=mono, bd=0, padx=12, pady=8,
-            relief="flat",
-            yscrollcommand=sb.set,
-        )
-        self.txt.pack(fill="both", expand=True)
-        sb.config(command=self.txt.yview)
-
-        # Tags
-        self.txt.tag_configure("titulo",
-            foreground=C["col_ERROR"], font=("Consolas", 12, "bold"))
-        self.txt.tag_configure("num",
-            foreground=C["accent"], font=("Consolas", 11, "bold"))
-        self.txt.tag_configure("label",
-            foreground=C["fg_dim"])
-        self.txt.tag_configure("valor",
-            foreground=C["col_OPR"], font=("Consolas", 11, "bold"))
-        self.txt.tag_configure("msg",
-            foreground=C["fg_main"])
-        self.txt.tag_configure("ok",
-            foreground=C["ok_green"], font=("Consolas", 12, "bold"))
-        self.txt.tag_configure("sep",
-            foreground=C["border"])
-
-    def _escribir(self, texto: str, *tags):
-        self.txt.config(state="normal")
-        self.txt.insert("end", texto, tags)
-        self.txt.config(state="disabled")
-
-    def poblar(self, errores: list):
-        self.txt.config(state="normal")
-        self.txt.delete("1.0", "end")
-        self.txt.config(state="disabled")
-
-        if not errores:
-            self._escribir("\n  ✔  Sin errores léxicos detectados.\n", "ok")
-            return
-
-        self._escribir(
-            f"\n  ERRORES LÉXICOS DETECTADOS ({len(errores)})\n",
-            "titulo"
-        )
-        self._escribir("  " + "─" * 56 + "\n", "sep")
-
-        for i, err in enumerate(errores, 1):
-            self._escribir(f"\n  [{i}] ", "num")
-            self._escribir("ERROR LÉXICO\n", "titulo")
-            self._escribir("  Descripción : ", "label")
-            self._escribir(f"{err.mensaje}\n", "msg")
-            self._escribir("  Lexema      : ", "label")
-            self._escribir(f"'{err.lexema}'\n", "valor")
-            self._escribir("  Línea       : ", "label")
-            self._escribir(f"{err.linea}\n", "valor")
-            self._escribir("  Columna     : ", "label")
-            self._escribir(f"{err.columna}\n", "valor")
-
-        self._escribir("\n  " + "─" * 56 + "\n", "sep")
-
-    def limpiar(self):
-        self.txt.config(state="normal")
-        self.txt.delete("1.0", "end")
-        self.txt.config(state="disabled")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -404,7 +305,6 @@ class PanelResumen(tk.Frame):
     def _construir(self):
         C = self.colores
 
-        # Canvas con scroll
         sb = ttk.Scrollbar(self, orient="vertical")
         sb.pack(side="right", fill="y")
 
@@ -416,9 +316,7 @@ class PanelResumen(tk.Frame):
         sb.config(command=self.canvas.yview)
 
         self.inner = tk.Frame(self.canvas, bg=C["bg_panel"])
-        self._win = self.canvas.create_window(
-            (0, 0), window=self.inner, anchor="nw"
-        )
+        self._win = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
 
         self.inner.bind("<Configure>", self._on_configure)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
@@ -429,34 +327,25 @@ class PanelResumen(tk.Frame):
     def _on_canvas_resize(self, event):
         self.canvas.itemconfig(self._win, width=event.width)
 
-    def poblar(self, tokens: list, errores: list):
+    def poblar(self, tokens: list):
         C = self.colores
 
-        # Destruir contenido anterior
         for w in self.inner.winfo_children():
             w.destroy()
 
-        total   = len(tokens)
-        n_err   = len(errores)
+        total  = len(tokens)
         conteos = {}
         for tok in tokens:
             conteos[tok.tipo] = conteos.get(tok.tipo, 0) + 1
-
-        pad = {"padx": 20, "pady": 4}
 
         # ── Encabezado ────────────────────────────────────────
         tk.Label(self.inner, text="RESUMEN DEL ANÁLISIS",
                  bg=C["bg_panel"], fg=C["accent"],
                  font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=20, pady=(16, 2))
 
-        sep = tk.Frame(self.inner, height=1, bg=C["border"])
-        sep.pack(fill="x", padx=20, pady=4)
+        tk.Frame(self.inner, height=1, bg=C["border"]).pack(fill="x", padx=20, pady=4)
 
         # ── Totales ───────────────────────────────────────────
-        color_err = C["ok_green"] if n_err == 0 else C["col_ERROR"]
-        estado_txt = "ANÁLISIS EXITOSO  ✔" if n_err == 0 else f"CON ERRORES  ✖ ({n_err})"
-        estado_col = C["ok_green"] if n_err == 0 else C["col_ERROR"]
-
         def stat_row(lbl, val, color):
             f = tk.Frame(self.inner, bg=C["bg_panel"])
             f.pack(fill="x", padx=20, pady=2)
@@ -466,12 +355,10 @@ class PanelResumen(tk.Frame):
             tk.Label(f, text=str(val), bg=C["bg_panel"],
                      fg=color, font=("Consolas", 12, "bold")).pack(side="left")
 
-        stat_row("Total tokens:",   total, C["col_NUM"])
-        stat_row("Total errores:",  n_err, color_err)
-        stat_row("Estado:",         estado_txt, estado_col)
+        stat_row("Total tokens:", total, C["col_NUM"])
+        stat_row("Estado:", "ANÁLISIS EXITOSO  ✔", C["ok_green"])
 
-        tk.Frame(self.inner, height=1, bg=C["border"]).pack(
-            fill="x", padx=20, pady=8)
+        tk.Frame(self.inner, height=1, bg=C["border"]).pack(fill="x", padx=20, pady=8)
 
         # ── Distribución por tipo ─────────────────────────────
         tk.Label(self.inner, text="Distribución por tipo:",
@@ -488,49 +375,24 @@ class PanelResumen(tk.Frame):
             row = tk.Frame(self.inner, bg=C["bg_panel"])
             row.pack(fill="x", padx=20, pady=3)
 
-            # Etiqueta tipo
             tk.Label(row, text=f"{tipo:<5}", bg=C["bg_panel"],
                      fg=color, font=("Consolas", 11, "bold"),
                      width=6, anchor="w").pack(side="left")
-
-            # Nombre
             tk.Label(row, text=nombre, bg=C["bg_panel"],
                      fg=C["fg_dim"], font=("Segoe UI", 10),
                      width=20, anchor="w").pack(side="left")
 
-            # Barra de progreso
-            bar_frame = tk.Frame(row, bg=C["bg_toolbar"],
-                                  height=14, width=200)
+            bar_frame = tk.Frame(row, bg=C["bg_toolbar"], height=14, width=200)
             bar_frame.pack(side="left", padx=(4, 8))
             bar_frame.pack_propagate(False)
 
             fill_w = max(int(200 * pct), 2) if cnt > 0 else 0
             if fill_w > 0:
-                tk.Frame(bar_frame, bg=color,
-                         width=fill_w, height=14).place(x=0, y=0)
+                tk.Frame(bar_frame, bg=color, width=fill_w, height=14).place(x=0, y=0)
 
-            # Conteo
             tk.Label(row, text=str(cnt), bg=C["bg_panel"],
                      fg=color, font=("Consolas", 11, "bold"),
                      width=4, anchor="e").pack(side="left")
-
-        # ── Lista de errores breve ────────────────────────────
-        if errores:
-            tk.Frame(self.inner, height=1, bg=C["border"]).pack(
-                fill="x", padx=20, pady=8)
-            tk.Label(self.inner, text="Resumen de errores:",
-                     bg=C["bg_panel"], fg=C["col_ERROR"],
-                     font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=20, pady=(0, 4))
-
-            for err in errores:
-                f = tk.Frame(self.inner, bg=C["bg_panel"])
-                f.pack(fill="x", padx=24, pady=1)
-                tk.Label(f, text=f"Línea {err.linea:>3}, Col {err.columna:>3} │",
-                         bg=C["bg_panel"], fg=C["fg_dim"],
-                         font=("Consolas", 10)).pack(side="left")
-                tk.Label(f, text=f" '{err.lexema}'",
-                         bg=C["bg_panel"], fg=C["col_OPR"],
-                         font=("Consolas", 10, "bold")).pack(side="left")
 
         self.inner.update_idletasks()
         self._on_configure()
@@ -550,8 +412,7 @@ class AplicacionFISIO(tk.Tk):
         super().__init__()
         self.C = COLORES_GUI
         self._archivo_actual: str | None = None
-        self._tokens  = []
-        self._errores = []
+        self._tokens = []
         self._configurar_ventana()
         self._construir_ui()
         self._cargar_ejemplo("MRU completo")
@@ -570,72 +431,9 @@ class AplicacionFISIO(tk.Tk):
 
     # ── Construcción de la UI ─────────────────────────────────
     def _construir_ui(self):
-        C = self.C
-        self._construir_menubar()
         self._construir_toolbar()
         self._construir_cuerpo()
         self._construir_statusbar()
-
-    # ── Menú ──────────────────────────────────────────────────
-    def _construir_menubar(self):
-        C = self.C
-        mb = tk.Menu(self, bg=C["bg_toolbar"], fg=C["fg_main"],
-                     activebackground=C["border"],
-                     activeforeground=C["accent"],
-                     relief="flat", bd=0)
-        self.config(menu=mb)
-
-        # Archivo
-        m_arch = tk.Menu(mb, tearoff=0, bg=C["bg_toolbar"],
-                         fg=C["fg_main"],
-                         activebackground=C["border"],
-                         activeforeground=C["accent"])
-        mb.add_cascade(label="Archivo", menu=m_arch)
-        m_arch.add_command(label="Abrir archivo (.txt)…",
-                           command=self._abrir_archivo,
-                           accelerator="Ctrl+O")
-        m_arch.add_command(label="Guardar como…",
-                           command=self._guardar_archivo,
-                           accelerator="Ctrl+S")
-        m_arch.add_separator()
-        m_arch.add_command(label="Salir", command=self._salir)
-
-        # Análisis
-        m_anal = tk.Menu(mb, tearoff=0, bg=C["bg_toolbar"],
-                         fg=C["fg_main"],
-                         activebackground=C["border"],
-                         activeforeground=C["accent"])
-        mb.add_cascade(label="Análisis", menu=m_anal)
-        m_anal.add_command(label="▶  Analizar código",
-                           command=self._analizar,
-                           accelerator="F5")
-        m_anal.add_command(label="✕  Limpiar todo",
-                           command=self._limpiar_todo)
-
-        # Ejemplos
-        m_ej = tk.Menu(mb, tearoff=0, bg=C["bg_toolbar"],
-                       fg=C["fg_main"],
-                       activebackground=C["border"],
-                       activeforeground=C["accent"])
-        mb.add_cascade(label="Ejemplos", menu=m_ej)
-        for nombre in EJEMPLOS:
-            m_ej.add_command(
-                label=nombre,
-                command=lambda n=nombre: self._cargar_ejemplo(n)
-            )
-
-        # Ayuda
-        m_ayuda = tk.Menu(mb, tearoff=0, bg=C["bg_toolbar"],
-                          fg=C["fg_main"],
-                          activebackground=C["border"],
-                          activeforeground=C["accent"])
-        mb.add_cascade(label="Ayuda", menu=m_ayuda)
-        m_ayuda.add_command(label="Acerca de FISIO", command=self._acerca_de)
-
-        # Atajos globales
-        self.bind("<F5>",       lambda _: self._analizar())
-        self.bind("<Control-o>", lambda _: self._abrir_archivo())
-        self.bind("<Control-s>", lambda _: self._guardar_archivo())
 
     # ── Toolbar ───────────────────────────────────────────────
     def _construir_toolbar(self):
@@ -644,13 +442,12 @@ class AplicacionFISIO(tk.Tk):
         bar.pack(fill="x", side="top")
         bar.pack_propagate(False)
 
-        # Separador inferior de toolbar
         tk.Frame(self, height=1, bg=C["border"]).pack(fill="x", side="top")
 
         def btn(parent, texto, cmd, color_fg=None, color_bg=None, emoji=""):
-            fg  = color_fg or C["fg_main"]
-            bg  = color_bg or C["bg_toolbar"]
-            b   = tk.Button(
+            fg = color_fg or C["fg_main"]
+            bg = color_bg or C["bg_toolbar"]
+            b = tk.Button(
                 parent, text=f"  {emoji} {texto}  ",
                 command=cmd, fg=fg, bg=bg,
                 activeforeground=C["accent"],
@@ -664,27 +461,22 @@ class AplicacionFISIO(tk.Tk):
             b.bind("<Leave>", lambda _: b.config(bg=bg))
             return b
 
-        btn(bar, "Abrir",   self._abrir_archivo, emoji="📂")
-        btn(bar, "Guardar", self._guardar_archivo, emoji="💾")
+        btn(bar, "Abrir",           self._abrir_archivo,  emoji="📂")
+        btn(bar, "Guardar",         self._guardar_archivo, emoji="💾")
+        btn(bar, "Alfabeto FISIO",  self._mostrar_alfabeto, emoji="ℹ")
 
-        # Separador
-        tk.Frame(bar, width=1, bg=C["border"], height=28).pack(
-            side="left", padx=6, pady=8)
+        tk.Frame(bar, width=1, bg=C["border"], height=28).pack(side="left", padx=6, pady=8)
 
         btn(bar, "Analizar  [F5]", self._analizar,
             color_fg=C["bg_main"], color_bg=C["accent"], emoji="▶")
 
-        tk.Frame(bar, width=1, bg=C["border"], height=28).pack(
-            side="left", padx=6, pady=8)
+        tk.Frame(bar, width=1, bg=C["border"], height=28).pack(side="left", padx=6, pady=8)
 
         btn(bar, "Limpiar", self._limpiar_todo, emoji="✕")
 
-        # Menú de ejemplos desplegable en toolbar
         self._ejemplo_var = tk.StringVar(value="Ejemplos…")
-        ejm = tk.OptionMenu(
-            bar, self._ejemplo_var, *EJEMPLOS.keys(),
-            command=self._cargar_ejemplo
-        )
+        ejm = tk.OptionMenu(bar, self._ejemplo_var, *EJEMPLOS.keys(),
+                            command=self._cargar_ejemplo)
         ejm.config(
             fg=C["fg_main"], bg=C["bg_toolbar"],
             activeforeground=C["accent"],
@@ -699,7 +491,6 @@ class AplicacionFISIO(tk.Tk):
         )
         ejm.pack(side="left", padx=4)
 
-        # Logo / título
         tk.Label(bar, text="FISIO  Analizador Léxico",
                  bg=C["bg_toolbar"], fg=C["accent"],
                  font=("Segoe UI", 12, "bold")).pack(side="right", padx=16)
@@ -708,7 +499,6 @@ class AplicacionFISIO(tk.Tk):
     def _construir_cuerpo(self):
         C = self.C
 
-        # PanedWindow horizontal
         paned = tk.PanedWindow(
             self, orient="horizontal",
             bg=C["border"], sashwidth=4,
@@ -716,7 +506,7 @@ class AplicacionFISIO(tk.Tk):
         )
         paned.pack(fill="both", expand=True)
 
-        # ── Panel izquierdo: editor ───────────────────────────
+        # Panel izquierdo: editor
         izq = tk.Frame(paned, bg=C["bg_editor"])
         paned.add(izq, minsize=340, width=560)
 
@@ -729,21 +519,20 @@ class AplicacionFISIO(tk.Tk):
         self.editor = EditorCodigo(izq, C)
         self.editor.pack(fill="both", expand=True)
 
-        # ── Panel derecho: resultados (Notebook) ──────────────
+        # Panel derecho: Notebook
         der = tk.Frame(paned, bg=C["bg_panel"])
         paned.add(der, minsize=340)
 
-        # Estilo del Notebook
         style = ttk.Style()
         style.configure("Fisio.TNotebook",
             background=C["bg_panel"],
             tabmargins=[0, 0, 0, 0],
         )
         style.configure("Fisio.TNotebook.Tab",
-            background  = C["bg_toolbar"],
-            foreground  = C["fg_dim"],
-            padding     = [14, 6],
-            font        = ("Segoe UI", 10, "bold"),
+            background = C["bg_toolbar"],
+            foreground = C["fg_dim"],
+            padding    = [14, 6],
+            font       = ("Segoe UI", 10, "bold"),
         )
         style.map("Fisio.TNotebook.Tab",
             background = [("selected", C["bg_panel"])],
@@ -758,12 +547,6 @@ class AplicacionFISIO(tk.Tk):
         self.notebook.add(frame_tok, text="  🔑  Tokens  ")
         self.tabla_tokens = TablaTokens(frame_tok, C)
         self.tabla_tokens.pack(fill="both", expand=True)
-
-        # Pestaña Errores
-        frame_err = tk.Frame(self.notebook, bg=C["bg_panel"])
-        self.notebook.add(frame_err, text="  ⚠  Errores  ")
-        self.panel_errores = PanelErrores(frame_err, C)
-        self.panel_errores.pack(fill="both", expand=True)
 
         # Pestaña Resumen
         frame_res = tk.Frame(self.notebook, bg=C["bg_panel"])
@@ -781,23 +564,266 @@ class AplicacionFISIO(tk.Tk):
 
         self._sv_archivo = tk.StringVar(value="Sin archivo")
         self._sv_tokens  = tk.StringVar(value="Tokens: —")
-        self._sv_errores = tk.StringVar(value="Errores: —")
         self._sv_estado  = tk.StringVar(value="Listo")
 
         def lbl(parent, var, fg=None, side="left", padx=8):
-            return tk.Label(parent, textvariable=var,
-                            bg=C["bg_status"],
-                            fg=fg or C["fg_dim"],
-                            font=("Segoe UI", 9)).pack(side=side, padx=padx)
+            tk.Label(parent, textvariable=var,
+                     bg=C["bg_status"],
+                     fg=fg or C["fg_dim"],
+                     font=("Segoe UI", 9)).pack(side=side, padx=padx)
 
         lbl(bar, self._sv_archivo, fg=C["fg_dim"])
         tk.Frame(bar, width=1, bg=C["border"]).pack(side="left", fill="y", pady=4)
-        lbl(bar, self._sv_tokens,  fg=C["col_NUM"])
-        tk.Frame(bar, width=1, bg=C["border"]).pack(side="left", fill="y", pady=4)
-        lbl(bar, self._sv_errores, fg=C["col_ERROR"])
-        lbl(bar, self._sv_estado,  fg=C["accent"], side="right", padx=12)
+        lbl(bar, self._sv_tokens, fg=C["col_NUM"])
+        lbl(bar, self._sv_estado, fg=C["accent"], side="right", padx=12)
 
     # ── Acciones ──────────────────────────────────────────────
+    def _mostrar_alfabeto(self):
+        """Ventana avanzada con información completa del lenguaje FISIO."""
+
+        C = self.C
+
+        win = tk.Toplevel(self)
+        win.title("Alfabeto y Tokens — FISIO")
+        win.geometry("850x700")
+        win.configure(bg=C["bg_main"])
+        win.resizable(True, True)
+        win.grab_set()
+
+        # ─────────────────────────────────────────
+        # HEADER
+        # ─────────────────────────────────────────
+        header = tk.Frame(win, bg=C["bg_toolbar"], height=60)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+
+        tk.Label(
+            header,
+            text="📘 Lenguaje FISIO — Tokens y Alfabeto",
+            bg=C["bg_toolbar"],
+            fg=C["accent"],
+            font=("Segoe UI", 18, "bold")
+        ).pack(side="left", padx=20)
+
+        # ─────────────────────────────────────────
+        # SCROLLABLE AREA
+        # ─────────────────────────────────────────
+        canvas = tk.Canvas(
+            win,
+            bg=C["bg_main"],
+            highlightthickness=0
+        )
+        canvas.pack(side="left", fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        content = tk.Frame(canvas, bg=C["bg_main"])
+        canvas.create_window((0, 0), window=content, anchor="nw")
+
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        content.bind("<Configure>", on_configure)
+
+        # ─────────────────────────────────────────
+        # HELPERS
+        # ─────────────────────────────────────────
+        def titulo(texto):
+            tk.Label(
+                content,
+                text=texto,
+                bg=C["bg_main"],
+                fg=C["accent"],
+                font=("Segoe UI", 15, "bold")
+            ).pack(anchor="w", padx=20, pady=(18, 6))
+
+        def separador():
+            tk.Frame(
+                content,
+                height=1,
+                bg=C["border"]
+            ).pack(fill="x", padx=20, pady=6)
+
+        def item(lexema, tipo, token_id, color):
+            fila = tk.Frame(content, bg=C["bg_panel"])
+            fila.pack(fill="x", padx=30, pady=2)
+
+            tk.Label(
+                fila,
+                text=lexema,
+                width=18,
+                anchor="w",
+                bg=C["bg_panel"],
+                fg=color,
+                font=("Consolas", 11, "bold")
+            ).pack(side="left", padx=10, pady=6)
+
+            tk.Label(
+                fila,
+                text=tipo,
+                width=10,
+                anchor="center",
+                bg=C["bg_panel"],
+                fg=C["fg_main"],
+                font=("Consolas", 10)
+            ).pack(side="left")
+
+            tk.Label(
+                fila,
+                text=token_id,
+                width=12,
+                anchor="center",
+                bg=C["bg_panel"],
+                fg=C["fg_dim"],
+                font=("Consolas", 10)
+            ).pack(side="left")
+
+        # ─────────────────────────────────────────
+        # INFORMACIÓN GENERAL
+        # ─────────────────────────────────────────
+        titulo("Información General")
+
+        info = (
+            "FISIO es un lenguaje orientado a simulaciones y cálculos "
+            "de física clásica.\n\n"
+            "El analizador léxico identifica palabras reservadas, "
+            "operadores, signos, identificadores y números."
+        )
+
+        tk.Label(
+            content,
+            text=info,
+            justify="left",
+            bg=C["bg_main"],
+            fg=C["fg_main"],
+            font=("Segoe UI", 10)
+        ).pack(anchor="w", padx=30)
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # PALABRAS RESERVADAS
+        # ─────────────────────────────────────────
+        titulo("📚 Palabras Reservadas")
+
+        for lexema, (tipo, token_id) in PALABRAS_RESERVADAS.items():
+            item(lexema, tipo, token_id, C["col_PR"])
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # OPERADORES MATEMÁTICOS
+        # ─────────────────────────────────────────
+        titulo("➕ Operadores Matemáticos")
+
+        for lexema, (tipo, token_id) in OPERADORES_MATEMATICOS.items():
+            item(lexema, tipo, token_id, C["col_OPM"])
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # OPERADORES RELACIONALES
+        # ─────────────────────────────────────────
+        titulo("🔀 Operadores Relacionales")
+
+        for lexema, (tipo, token_id) in OPERADORES_RELACIONALES.items():
+            item(lexema, tipo, token_id, C["col_OPR"])
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # SIGNOS
+        # ─────────────────────────────────────────
+        titulo("🔣 Signos")
+
+        for lexema, (tipo, token_id) in SIGNOS.items():
+            item(lexema, tipo, token_id, C["col_SIG"])
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # ALFABETO
+        # ─────────────────────────────────────────
+        titulo("🔤 Alfabeto Permitido")
+
+        alfabeto_texto = (
+            "• Letras: a-z A-Z\n"
+            "• Dígitos: 0-9\n"
+            "• Operadores matemáticos: + - * / ^\n"
+            "• Operadores relacionales: := = < > <= >= !=\n"
+            "• Signos: ( ) [ ] , . ;\n"
+            "• Espacios válidos: espacio, tabulación y salto de línea"
+        )
+
+        tk.Label(
+            content,
+            text=alfabeto_texto,
+            justify="left",
+            bg=C["bg_main"],
+            fg=C["fg_main"],
+            font=("Consolas", 10)
+        ).pack(anchor="w", padx=30)
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # TIPOS DE TOKEN
+        # ─────────────────────────────────────────
+        titulo("🧩 Tipos de Token")
+
+        tipos = [
+            ("PR", "Palabra Reservada", C["col_PR"]),
+            ("OPM", "Operador Matemático", C["col_OPM"]),
+            ("OPR", "Operador Relacional", C["col_OPR"]),
+            ("SIG", "Signo", C["col_SIG"]),
+            ("ID", "Identificador", C["col_ID"]),
+            ("NUM", "Número", C["col_NUM"]),
+            ("ERROR", "Token inválido", "#ff5555"),
+        ]
+
+        for sigla, desc, color in tipos:
+            fila = tk.Frame(content, bg=C["bg_panel"])
+            fila.pack(fill="x", padx=30, pady=2)
+
+            tk.Label(
+                fila,
+                text=sigla,
+                width=10,
+                bg=C["bg_panel"],
+                fg=color,
+                font=("Consolas", 11, "bold")
+            ).pack(side="left", padx=10, pady=6)
+
+            tk.Label(
+                fila,
+                text=desc,
+                bg=C["bg_panel"],
+                fg=C["fg_main"],
+                font=("Segoe UI", 10)
+            ).pack(side="left")
+
+        separador()
+
+        # ─────────────────────────────────────────
+        # BOTÓN CERRAR
+        # ─────────────────────────────────────────
+        tk.Button(
+            content,
+            text="Cerrar",
+            command=win.destroy,
+            bg=C["accent"],
+            fg=C["bg_main"],
+            relief="flat",
+            bd=0,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+            font=("Segoe UI", 10, "bold")
+        ).pack(pady=20)
+
     def _analizar(self):
         codigo = self.editor.get_codigo()
         if not codigo.strip():
@@ -808,28 +834,16 @@ class AplicacionFISIO(tk.Tk):
             return
 
         lex = Lexer(codigo)
-        self._tokens, self._errores = lex.analizar()
+        self._tokens, _ = lex.analizar()
 
-        # Actualizar widgets
         self.tabla_tokens.poblar(self._tokens)
-        self.panel_errores.poblar(self._errores)
-        self.panel_resumen.poblar(self._tokens, self._errores)
-        self.editor.resaltar(self._tokens, self._errores)
+        self.panel_resumen.poblar(self._tokens)
+        self.editor.resaltar(self._tokens)
 
-        # Status bar
         n_tok = len(self._tokens)
-        n_err = len(self._errores)
         self._sv_tokens.set(f"Tokens: {n_tok}")
-        self._sv_errores.set(f"Errores: {n_err}")
-
-        if n_err == 0:
-            self._sv_estado.set(f"✔ Análisis exitoso")
-            # Ir a pestaña Tokens
-            self.notebook.select(0)
-        else:
-            self._sv_estado.set(f"✖ {n_err} error(es) encontrado(s)")
-            # Ir a pestaña Errores
-            self.notebook.select(1)
+        self._sv_estado.set("✔ Análisis exitoso")
+        self.notebook.select(0)
 
     def _abrir_archivo(self):
         ruta = filedialog.askopenfilename(
@@ -881,16 +895,13 @@ class AplicacionFISIO(tk.Tk):
         self._limpiar_resultados()
         self._sv_archivo.set("Sin archivo")
         self._sv_tokens.set("Tokens: —")
-        self._sv_errores.set("Errores: —")
         self._sv_estado.set("Listo")
         self.title("FISIO — Analizador Léxico")
 
     def _limpiar_resultados(self):
         self.tabla_tokens.limpiar()
-        self.panel_errores.limpiar()
         self.panel_resumen.limpiar()
         self._sv_tokens.set("Tokens: —")
-        self._sv_errores.set("Errores: —")
         self._sv_estado.set("Listo")
 
     def _acerca_de(self):
@@ -916,12 +927,11 @@ class AplicacionFISIO(tk.Tk):
             ("Lenguaje",  "Python 3.11+ / Tkinter"),
             ("Módulos",   "MRU · MRUA · Caída Libre · Parabólico"),
             ("Tokens PR", "18 palabras reservadas"),
-            ("Pruebas",   "21 casos automatizados"),
         ]
-        for lbl, val in info:
+        for lbl_txt, val in info:
             f = tk.Frame(win, bg=C["bg_main"])
             f.pack(anchor="center", pady=2)
-            tk.Label(f, text=f"{lbl}:", bg=C["bg_main"],
+            tk.Label(f, text=f"{lbl_txt}:", bg=C["bg_main"],
                      fg=C["fg_dim"], font=("Segoe UI", 10),
                      width=12, anchor="e").pack(side="left")
             tk.Label(f, text=val, bg=C["bg_main"],
