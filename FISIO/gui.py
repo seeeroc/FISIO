@@ -70,6 +70,20 @@ h := 3#14;
 i := 5 ! 3;
 1variable := 10;
 """,
+    "Errores de alfabeto (Reales)": """\
+; Todos estos símbolos están fuera del alfabeto FISIO
+x := 5 @ 2;
+y := 3 # 14;
+precio := 100$;
+porcentaje := 50%;
+y_comercial := a & b;
+mi_variable := 25;
+conjunto := { 1, 2, 3 };
+mensaje := "hola";
+operador_invalido := a \\ b | c;
+pregunta := ¿test?;
+info := ¡alerta!;
+""",
 }
 
 
@@ -336,6 +350,17 @@ class PanelResumen(tk.Frame):
         self.inner.bind("<Configure>", self._on_configure)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.inner.bind("<MouseWheel>", self._on_mousewheel)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _bind_mousewheel(self, widget):
+        widget.bind("<MouseWheel>", self._on_mousewheel)
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
+
     def _on_configure(self, _e=None):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
@@ -438,10 +463,221 @@ class PanelResumen(tk.Frame):
 
         self.inner.update_idletasks()
         self._on_configure()
+        self._bind_mousewheel(self.inner)
 
     def limpiar(self):
         for w in self.inner.winfo_children():
             w.destroy()
+
+
+# ─────────────────────────────────────────────────────────────
+#  WIDGET: PANEL ALFABETO / ESPECIFICACIÓN
+# ─────────────────────────────────────────────────────────────
+class PanelAlfabeto(tk.Frame):
+    """Muestra la especificación del alfabeto y tokens del lenguaje FISIO."""
+
+    def __init__(self, parent, colores: dict, **kwargs):
+        super().__init__(parent, bg=colores["bg_panel"], **kwargs)
+        self.colores = colores
+        self._construir()
+
+    def _construir(self):
+        C = self.colores
+
+        sb = ttk.Scrollbar(self, orient="vertical")
+        sb.pack(side="right", fill="y")
+
+        self.canvas = tk.Canvas(
+            self, bg=C["bg_panel"], bd=0, highlightthickness=0,
+            yscrollcommand=sb.set,
+        )
+        self.canvas.pack(fill="both", expand=True)
+        sb.config(command=self.canvas.yview)
+
+        self.inner = tk.Frame(self.canvas, bg=C["bg_panel"])
+        self._win = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+
+        self.inner.bind("<Configure>", self._on_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.inner.bind("<MouseWheel>", self._on_mousewheel)
+
+        self._poblar_informacion()
+        self._bind_mousewheel(self.inner)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _bind_mousewheel(self, widget):
+        widget.bind("<MouseWheel>", self._on_mousewheel)
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
+
+    def _on_configure(self, _e=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_resize(self, event):
+        self.canvas.itemconfig(self._win, width=event.width)
+
+    def _poblar_informacion(self):
+        C = self.colores
+
+        def titulo(texto):
+            tk.Label(
+                self.inner,
+                text=texto,
+                bg=C["bg_panel"],
+                fg=C["accent"],
+                font=("Segoe UI", 12, "bold")
+            ).pack(anchor="w", padx=20, pady=(16, 4))
+
+        def separador():
+            tk.Frame(
+                self.inner,
+                height=1,
+                bg=C["border"]
+            ).pack(fill="x", padx=20, pady=6)
+
+        def item(lexema, tipo, token_id, color):
+            fila = tk.Frame(self.inner, bg=C["bg_panel"])
+            fila.pack(fill="x", padx=20, pady=2)
+
+            tk.Label(
+                fila,
+                text=lexema,
+                width=18,
+                anchor="w",
+                bg=C["bg_panel"],
+                fg=color,
+                font=("Consolas", 10, "bold")
+            ).pack(side="left", padx=(10, 4), pady=2)
+
+            tk.Label(
+                fila,
+                text=tipo,
+                width=10,
+                anchor="center",
+                bg=C["bg_panel"],
+                fg=C["fg_main"],
+                font=("Consolas", 9)
+            ).pack(side="left")
+
+            tk.Label(
+                fila,
+                text=token_id,
+                width=12,
+                anchor="center",
+                bg=C["bg_panel"],
+                fg=C["fg_dim"],
+                font=("Consolas", 9)
+            ).pack(side="left")
+
+        # ── Encabezado ──
+        tk.Label(self.inner, text="ESPECIFICACIÓN LÉXICA FISIO",
+                 bg=C["bg_panel"], fg=C["accent"],
+                 font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=20, pady=(16, 2))
+
+        separador()
+
+        # ── Información General ──
+        info = (
+            "FISIO es un lenguaje orientado a simulaciones y cálculos "
+            "de física clásica.\n"
+            "El analizador léxico identifica palabras reservadas, "
+            "operadores, signos, identificadores y números."
+        )
+        tk.Label(
+            self.inner,
+            text=info,
+            justify="left",
+            bg=C["bg_panel"],
+            fg=C["fg_main"],
+            font=("Segoe UI", 10)
+        ).pack(anchor="w", padx=20, pady=(0, 6))
+
+        separador()
+
+        # ── Alfabeto Permitido ──
+        titulo("🔤 Alfabeto Permitido")
+        alfabeto_texto = (
+            "• Letras: a-z A-Z\n"
+            "• Dígitos: 0-9\n"
+            "• Operadores matemáticos: + - * / ^\n"
+            "• Operadores relacionales: := = < > <= >= !=\n"
+            "• Signos: ( ) [ ] , . ;\n"
+            "• Espacios válidos: espacio, tabulación y salto de línea"
+        )
+        tk.Label(
+            self.inner,
+            text=alfabeto_texto,
+            justify="left",
+            bg=C["bg_panel"],
+            fg=C["fg_main"],
+            font=("Consolas", 10)
+        ).pack(anchor="w", padx=30, pady=(0, 6))
+
+        separador()
+
+        # ── Palabras Reservadas ──
+        titulo("📚 Palabras Reservadas")
+        for lexema, (tipo, token_id) in PALABRAS_RESERVADAS.items():
+            item(lexema, tipo, token_id, C["col_PR"])
+
+        separador()
+
+        # ── Operadores Matemáticos ──
+        titulo("➕ Operadores Matemáticos")
+        for lexema, (tipo, token_id) in OPERADORES_MATEMATICOS.items():
+            item(lexema, tipo, token_id, C["col_OPM"])
+
+        separador()
+
+        # ── Operadores Relacionales ──
+        titulo("🔀 Operadores Relacionales")
+        for lexema, (tipo, token_id) in OPERADORES_RELACIONALES.items():
+            item(lexema, tipo, token_id, C["col_OPR"])
+
+        separador()
+
+        # ── Signos ──
+        titulo("🔣 Signos")
+        for lexema, (tipo, token_id) in SIGNOS.items():
+            item(lexema, tipo, token_id, C["col_SIG"])
+
+        separador()
+
+        # ── Tipos de Token ──
+        titulo("🧩 Tipos de Token")
+        tipos = [
+            ("PR", "Palabra Reservada", C["col_PR"]),
+            ("OPM", "Operador Matemático", C["col_OPM"]),
+            ("OPR", "Operador Relacional", C["col_OPR"]),
+            ("SIG", "Signo", C["col_SIG"]),
+            ("ID", "Identificador", C["col_ID"]),
+            ("NUM", "Número", C["col_NUM"]),
+            ("ERROR", "Token inválido", "#ff5555"),
+        ]
+        for sigla, desc, color in tipos:
+            fila = tk.Frame(self.inner, bg=C["bg_panel"])
+            fila.pack(fill="x", padx=20, pady=2)
+
+            tk.Label(
+                fila,
+                text=sigla,
+                width=10,
+                bg=C["bg_panel"],
+                fg=color,
+                font=("Consolas", 10, "bold")
+            ).pack(side="left", padx=(10, 4), pady=2)
+
+            tk.Label(
+                fila,
+                text=desc,
+                bg=C["bg_panel"],
+                fg=C["fg_main"],
+                font=("Segoe UI", 9)
+            ).pack(side="left")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -506,7 +742,7 @@ class AplicacionFISIO(tk.Tk):
 
         btn(bar, "Abrir",           self._abrir_archivo,  emoji="📂")
         btn(bar, "Guardar",         self._guardar_archivo, emoji="💾")
-        btn(bar, "Alfabeto FISIO",  self._mostrar_alfabeto, emoji="ℹ")
+        btn(bar, "Alfabeto FISIO",  self._mostrar_alfabeto_tab, emoji="ℹ")
 
         tk.Frame(bar, width=1, bg=C["border"], height=28).pack(side="left", padx=6, pady=8)
 
@@ -597,6 +833,12 @@ class AplicacionFISIO(tk.Tk):
         self.panel_resumen = PanelResumen(frame_res, C)
         self.panel_resumen.pack(fill="both", expand=True)
 
+        # Pestaña Alfabeto
+        frame_alf = tk.Frame(self.notebook, bg=C["bg_panel"])
+        self.notebook.add(frame_alf, text="  📘  Alfabeto  ")
+        self.panel_alfabeto = PanelAlfabeto(frame_alf, C)
+        self.panel_alfabeto.pack(fill="both", expand=True)
+
     # ── Barra de estado ───────────────────────────────────────
     def _construir_statusbar(self):
         C = self.C
@@ -624,251 +866,9 @@ class AplicacionFISIO(tk.Tk):
         lbl(bar, self._sv_estado, fg=C["accent"], side="right", padx=12)
 
     # ── Acciones ──────────────────────────────────────────────
-    def _mostrar_alfabeto(self):
-        """Ventana avanzada con información completa del lenguaje FISIO."""
-
-        C = self.C
-
-        win = tk.Toplevel(self)
-        win.title("Alfabeto y Tokens — FISIO")
-        win.geometry("850x700")
-        win.configure(bg=C["bg_main"])
-        win.resizable(True, True)
-        win.grab_set()
-
-        # ─────────────────────────────────────────
-        # HEADER
-        # ─────────────────────────────────────────
-        header = tk.Frame(win, bg=C["bg_toolbar"], height=60)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-
-        tk.Label(
-            header,
-            text="📘 Lenguaje FISIO — Tokens y Alfabeto",
-            bg=C["bg_toolbar"],
-            fg=C["accent"],
-            font=("Segoe UI", 18, "bold")
-        ).pack(side="left", padx=20)
-
-        # ─────────────────────────────────────────
-        # SCROLLABLE AREA
-        # ─────────────────────────────────────────
-        canvas = tk.Canvas(
-            win,
-            bg=C["bg_main"],
-            highlightthickness=0
-        )
-        canvas.pack(side="left", fill="both", expand=True)
-
-        scrollbar = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
-        scrollbar.pack(side="right", fill="y")
-
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        content = tk.Frame(canvas, bg=C["bg_main"])
-        canvas.create_window((0, 0), window=content, anchor="nw")
-
-        def on_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-
-        content.bind("<Configure>", on_configure)
-
-        # ─────────────────────────────────────────
-        # HELPERS
-        # ─────────────────────────────────────────
-        def titulo(texto):
-            tk.Label(
-                content,
-                text=texto,
-                bg=C["bg_main"],
-                fg=C["accent"],
-                font=("Segoe UI", 15, "bold")
-            ).pack(anchor="w", padx=20, pady=(18, 6))
-
-        def separador():
-            tk.Frame(
-                content,
-                height=1,
-                bg=C["border"]
-            ).pack(fill="x", padx=20, pady=6)
-
-        def item(lexema, tipo, token_id, color):
-            fila = tk.Frame(content, bg=C["bg_panel"])
-            fila.pack(fill="x", padx=30, pady=2)
-
-            tk.Label(
-                fila,
-                text=lexema,
-                width=18,
-                anchor="w",
-                bg=C["bg_panel"],
-                fg=color,
-                font=("Consolas", 11, "bold")
-            ).pack(side="left", padx=10, pady=6)
-
-            tk.Label(
-                fila,
-                text=tipo,
-                width=10,
-                anchor="center",
-                bg=C["bg_panel"],
-                fg=C["fg_main"],
-                font=("Consolas", 10)
-            ).pack(side="left")
-
-            tk.Label(
-                fila,
-                text=token_id,
-                width=12,
-                anchor="center",
-                bg=C["bg_panel"],
-                fg=C["fg_dim"],
-                font=("Consolas", 10)
-            ).pack(side="left")
-
-        # ─────────────────────────────────────────
-        # INFORMACIÓN GENERAL
-        # ─────────────────────────────────────────
-        titulo("Información General")
-
-        info = (
-            "FISIO es un lenguaje orientado a simulaciones y cálculos "
-            "de física clásica.\n\n"
-            "El analizador léxico identifica palabras reservadas, "
-            "operadores, signos, identificadores y números."
-        )
-
-        tk.Label(
-            content,
-            text=info,
-            justify="left",
-            bg=C["bg_main"],
-            fg=C["fg_main"],
-            font=("Segoe UI", 10)
-        ).pack(anchor="w", padx=30)
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # PALABRAS RESERVADAS
-        # ─────────────────────────────────────────
-        titulo("📚 Palabras Reservadas")
-
-        for lexema, (tipo, token_id) in PALABRAS_RESERVADAS.items():
-            item(lexema, tipo, token_id, C["col_PR"])
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # OPERADORES MATEMÁTICOS
-        # ─────────────────────────────────────────
-        titulo("➕ Operadores Matemáticos")
-
-        for lexema, (tipo, token_id) in OPERADORES_MATEMATICOS.items():
-            item(lexema, tipo, token_id, C["col_OPM"])
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # OPERADORES RELACIONALES
-        # ─────────────────────────────────────────
-        titulo("🔀 Operadores Relacionales")
-
-        for lexema, (tipo, token_id) in OPERADORES_RELACIONALES.items():
-            item(lexema, tipo, token_id, C["col_OPR"])
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # SIGNOS
-        # ─────────────────────────────────────────
-        titulo("🔣 Signos")
-
-        for lexema, (tipo, token_id) in SIGNOS.items():
-            item(lexema, tipo, token_id, C["col_SIG"])
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # ALFABETO
-        # ─────────────────────────────────────────
-        titulo("🔤 Alfabeto Permitido")
-
-        alfabeto_texto = (
-            "• Letras: a-z A-Z\n"
-            "• Dígitos: 0-9\n"
-            "• Operadores matemáticos: + - * / ^\n"
-            "• Operadores relacionales: := = < > <= >= !=\n"
-            "• Signos: ( ) [ ] , . ;\n"
-            "• Espacios válidos: espacio, tabulación y salto de línea"
-        )
-
-        tk.Label(
-            content,
-            text=alfabeto_texto,
-            justify="left",
-            bg=C["bg_main"],
-            fg=C["fg_main"],
-            font=("Consolas", 10)
-        ).pack(anchor="w", padx=30)
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # TIPOS DE TOKEN
-        # ─────────────────────────────────────────
-        titulo("🧩 Tipos de Token")
-
-        tipos = [
-            ("PR", "Palabra Reservada", C["col_PR"]),
-            ("OPM", "Operador Matemático", C["col_OPM"]),
-            ("OPR", "Operador Relacional", C["col_OPR"]),
-            ("SIG", "Signo", C["col_SIG"]),
-            ("ID", "Identificador", C["col_ID"]),
-            ("NUM", "Número", C["col_NUM"]),
-            ("ERROR", "Token inválido", "#ff5555"),
-        ]
-
-        for sigla, desc, color in tipos:
-            fila = tk.Frame(content, bg=C["bg_panel"])
-            fila.pack(fill="x", padx=30, pady=2)
-
-            tk.Label(
-                fila,
-                text=sigla,
-                width=10,
-                bg=C["bg_panel"],
-                fg=color,
-                font=("Consolas", 11, "bold")
-            ).pack(side="left", padx=10, pady=6)
-
-            tk.Label(
-                fila,
-                text=desc,
-                bg=C["bg_panel"],
-                fg=C["fg_main"],
-                font=("Segoe UI", 10)
-            ).pack(side="left")
-
-        separador()
-
-        # ─────────────────────────────────────────
-        # BOTÓN CERRAR
-        # ─────────────────────────────────────────
-        tk.Button(
-            content,
-            text="Cerrar",
-            command=win.destroy,
-            bg=C["accent"],
-            fg=C["bg_main"],
-            relief="flat",
-            bd=0,
-            padx=20,
-            pady=8,
-            cursor="hand2",
-            font=("Segoe UI", 10, "bold")
-        ).pack(pady=20)
+    def _mostrar_alfabeto_tab(self):
+        """Muestra la pestaña con la especificación del alfabeto."""
+        self.notebook.select(2)
 
     def _analizar(self):
         codigo = self.editor.get_codigo()
