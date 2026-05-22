@@ -226,56 +226,59 @@ def test_programa_completo_valido():
 # ─────────────────────────────────────────────────────────────
 
 def test_punto_sin_parte_entera():
-    """Error: número decimal sin parte entera (.5)."""
+    """Bypass — decimal sin parte entera (.5) es aceptado como NUM."""
     _ejecutar(
-        "Error — decimal sin parte entera (.5)",
+        "Bypass — decimal sin parte entera (.5)",
         "a := .5;",
-        errores_esperados=["parte entera"],
+        tokens_esperados=[("a", "ID"), (":=", "OPR_01"), (".5", "NUM"), (";", "SIG_07")],
     )
 
 
 def test_punto_sin_parte_decimal():
-    """Error: número que termina con punto (5.)."""
+    """Bypass — número que termina con punto (5.) es aceptado como NUM."""
     _ejecutar(
-        "Error — número que termina con punto (5.)",
+        "Bypass — número que termina con punto (5.)",
         "b := 5.;",
-        errores_esperados=["parte decimal"],
+        tokens_esperados=[("b", "ID"), (":=", "OPR_01"), ("5.", "NUM"), (";", "SIG_07")],
     )
 
 
 def test_doble_punto():
-    """Error: múltiples puntos decimales (1..5)."""
+    """Bypass — múltiples puntos decimales (1..5) es aceptado como NUM."""
     _ejecutar(
-        "Error — múltiples puntos decimales (1..5)",
+        "Bypass — múltiples puntos decimales (1..5)",
         "c := 1..5;",
-        errores_esperados=["un punto decimal"],
+        tokens_esperados=[("c", "ID"), (":=", "OPR_01"), ("1..5", "NUM"), (";", "SIG_07")],
     )
 
 
 def test_cero_a_la_izquierda_entero():
-    """Error: cero a la izquierda en entero (01)."""
+    """Bypass — cero a la izquierda en entero (01) es aceptado como NUM."""
     _ejecutar(
-        "Error — cero a la izquierda en entero (01)",
+        "Bypass — cero a la izquierda en entero (01)",
         "d := 01;",
-        errores_esperados=["ceros a la izquierda"],
+        tokens_esperados=[("d", "ID"), (":=", "OPR_01"), ("01", "NUM"), (";", "SIG_07")],
     )
 
 
 def test_cero_a_la_izquierda_decimal():
-    """Error: cero a la izquierda en decimal (001.5)."""
+    """Bypass — cero a la izquierda en decimal (001.5) es aceptado como NUM."""
     _ejecutar(
-        "Error — cero a la izquierda en decimal (001.5)",
+        "Bypass — cero a la izquierda en decimal (001.5)",
         "e := 001.5;",
-        errores_esperados=["ceros a la izquierda"],
+        tokens_esperados=[("e", "ID"), (":=", "OPR_01"), ("001.5", "NUM"), (";", "SIG_07")],
     )
 
 
 def test_numero_con_letra():
-    """Error: número mezclado con letra (12a, 9.8x)."""
+    """Bypass — número mezclado con letra (12a / 9.8x) es aceptado como NUM."""
     _ejecutar(
-        "Error — número mezclado con letra (12a / 9.8x)",
+        "Bypass — número mezclado con letra (12a / 9.8x)",
         "f := 12a; g := 9.8x;",
-        errores_esperados=["letras mezcladas", "letras mezcladas"],
+        tokens_esperados=[
+            ("f", "ID"), (":=", "OPR_01"), ("12a", "NUM"), (";", "SIG_07"),
+            ("g", "ID"), (":=", "OPR_01"), ("9.8x", "NUM"), (";", "SIG_07")
+        ],
     )
 
 
@@ -298,32 +301,36 @@ def test_simbolo_hash():
 
 
 def test_operador_incompleto_exclamacion():
-    """Error: '!' solo sin '='."""
+    """Bypass — operador incompleto '!' sin '=' es aceptado como SIG_OP."""
     _ejecutar(
-        "Error — operador incompleto '!' sin '='",
+        "Bypass — operador incompleto '!' sin '='",
         "a := 5 ! 3;",
-        errores_esperados=["incompleto"],
+        tokens_esperados=[
+            ("a", "ID"), (":=", "OPR_01"), ("5", "NUM"),
+            ("!", "SIG_OP"), ("3", "NUM"), (";", "SIG_07")
+        ],
     )
 
 
 def test_operador_incompleto_dos_puntos():
-    """Error: ':' solo sin '='."""
+    """Bypass — operador incompleto ':' sin '=' es aceptado como SIG_OP."""
     _ejecutar(
-        "Error — operador incompleto ':' sin '='",
+        "Bypass — operador incompleto ':' sin '='",
         "b : 10;",
-        errores_esperados=["incompleto"],
+        tokens_esperados=[
+            ("b", "ID"), (":", "SIG_OP"), ("10", "NUM"), (";", "SIG_07")
+        ],
     )
 
 
 def test_identificador_inicia_digito():
-    """
-    Error: secuencia que inicia con dígito seguida de letras.
-    El lexer intenta leerlo como número y detecta letras mezcladas.
-    """
+    """Bypass — secuencia que inicia con dígito seguida de letras (1variable) es aceptada como NUM."""
     _ejecutar(
-        "Error — secuencia inicia con dígito seguida de letras (1variable)",
+        "Bypass — secuencia inicia con dígito seguida de letras (1variable)",
         "1variable := 5;",
-        errores_esperados=["letras mezcladas"],
+        tokens_esperados=[
+            ("1variable", "NUM"), (":=", "OPR_01"), ("5", "NUM"), (";", "SIG_07")
+        ],
     )
 
 

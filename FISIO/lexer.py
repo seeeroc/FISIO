@@ -23,7 +23,7 @@ class Lexer:
         self.linea   = 1
         self.columna = 1
         self.tokens : list[Token] = []
-        # self.errores: list[Token] = []  # errors disabled
+        self.errores: list[Token] = []
 
     # ── Punto de entrada ─────────────────────────────────────
     def analizar(self) -> tuple[list[Token], list[Token]]:
@@ -141,10 +141,8 @@ class Lexer:
             while not self._fin() and (self._actual().isalnum() or self._actual() == '.'):
                 buf += self._actual()
                 self._avanzar()
-            self._registrar_error_en(
-                buf, lin_ini, col_ini,
-                f"Número decimal inválido '{buf}': "
-                "se esperaba parte entera antes del punto decimal."
+            self._agregar_token_en(
+                buf, TipoToken.NUMERO, "NUM", lin_ini, col_ini
             )
         else:
             self._agregar_token_en(".", *SIGNOS["."], lin_ini, col_ini)
@@ -165,11 +163,7 @@ class Lexer:
             self._agregar_token_en(primer, *OPERADORES_RELACIONALES[primer],
                                    lin_ini, col_ini)
         else:
-            self._registrar_error_en(
-                primer, lin_ini, col_ini,
-                f"Operador incompleto o inválido '{primer}': "
-                "no forma un operador reconocido del lenguaje FISIO."
-            )
+            self._agregar_token_en(primer, TipoToken.SIGNO, "SIG_OP", lin_ini, col_ini)
 
     # ── Navegación ────────────────────────────────────────────
     def _actual(self) -> str:        return self.fuente[self.pos]
@@ -181,7 +175,9 @@ class Lexer:
         self.tokens.append(Token(lex, tipo, id_tok, lin, col))
 
     def _registrar_error(self, lex, msg):
-        pass
+        self.errores.append(
+            Token(lex, TipoToken.ERROR, "ERROR", self.linea, self.columna, msg)
+        )
 
     def _registrar_error_en(self, lex, lin, col, msg):
-        pass
+        self.errores.append(Token(lex, TipoToken.ERROR, "ERROR", lin, col, msg))

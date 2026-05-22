@@ -13,8 +13,6 @@ import os
 import sys
 
 from lexer       import Lexer
-from token_types import TipoToken, PALABRAS_RESERVADAS, COLORES_GUI, ALFABETO_VALIDO
-
 from token_types import (
     TipoToken,
     PALABRAS_RESERVADAS,
@@ -22,7 +20,7 @@ from token_types import (
     OPERADORES_RELACIONALES,
     SIGNOS,
     COLORES_GUI,
-    ALFABETO_VALIDO
+    ALFABETO_VALIDO,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -144,6 +142,10 @@ class EditorCodigo(tk.Frame):
             "SIG"  : {"foreground": C["col_SIG"]},
             "ID"   : {"foreground": C["col_ID"]},
             "NUM"  : {"foreground": C["col_NUM"]},
+            "ERROR": {"foreground": C["col_ERROR"],
+                      "underline": True,
+                      "font": ("Consolas", 12, "italic")},
+            "linea_error": {"background": "#2d1b1b"},
         }
         for nombre, opts in tags.items():
             self.texto.tag_configure(nombre, **opts)
@@ -170,15 +172,27 @@ class EditorCodigo(tk.Frame):
         self.numeros.config(state="disabled")
         self.numeros.yview_moveto(self.texto.yview()[0])
 
-    def resaltar(self, tokens: list):
-        """Aplica tags de color al editor según los tokens encontrados."""
-        for tag in ("PR", "OPM", "OPR", "SIG", "ID", "NUM"):
+    def resaltar(self, tokens: list, errores: list):
+        """Aplica tags de color al editor según los tokens y errores encontrados."""
+        for tag in ("PR", "OPM", "OPR", "SIG", "ID", "NUM", "ERROR", "linea_error"):
             self.texto.tag_remove(tag, "1.0", "end")
 
+        # Marcar líneas con error de fondo
+        lineas_error = {e.linea for e in errores}
+        for l in lineas_error:
+            self.texto.tag_add("linea_error", f"{l}.0", f"{l}.end")
+
+        # Colorear tokens
         for tok in tokens:
             ini = f"{tok.linea}.{tok.columna - 1}"
             fin = f"{tok.linea}.{tok.columna - 1 + len(tok.lexema)}"
             self.texto.tag_add(tok.tipo, ini, fin)
+
+        # Subrayar lexemas de error
+        for err in errores:
+            ini = f"{err.linea}.{err.columna - 1}"
+            fin = f"{err.linea}.{err.columna - 1 + len(err.lexema)}"
+            self.texto.tag_add("ERROR", ini, fin)
 
     def get_codigo(self) -> str:
         return self.texto.get("1.0", "end-1c")
@@ -263,6 +277,7 @@ class TablaTokens(tk.Frame):
         for tipo, color in [
             ("PR", "col_PR"), ("OPM", "col_OPM"), ("OPR", "col_OPR"),
             ("SIG", "col_SIG"), ("ID", "col_ID"), ("NUM", "col_NUM"),
+            ("ERROR", "col_ERROR"),
         ]:
             self.tree.tag_configure(tipo, foreground=C[color])
         self.tree.tag_configure("par",   background=C["bg_row_alt"])
@@ -327,13 +342,14 @@ class PanelResumen(tk.Frame):
     def _on_canvas_resize(self, event):
         self.canvas.itemconfig(self._win, width=event.width)
 
-    def poblar(self, tokens: list):
+    def poblar(self, tokens: list, errores: list):
         C = self.colores
 
         for w in self.inner.winfo_children():
             w.destroy()
 
-        total  = len(tokens)
+        total   = len(tokens)
+        n_err   = len(errores)
         conteos = {}
         for tok in tokens:
             conteos[tok.tipo] = conteos.get(tok.tipo, 0) + 1
@@ -346,6 +362,10 @@ class PanelResumen(tk.Frame):
         tk.Frame(self.inner, height=1, bg=C["border"]).pack(fill="x", padx=20, pady=4)
 
         # ── Totales ───────────────────────────────────────────
+        color_err = C["ok_green"] if n_err == 0 else C["col_ERROR"]
+        estado_txt = "ANÁLISIS EXITOSO  ✔" if n_err == 0 else f"CON ERRORES  ✖ ({n_err})"
+        estado_col = C["ok_green"] if n_err == 0 else C["col_ERROR"]
+
         def stat_row(lbl, val, color):
             f = tk.Frame(self.inner, bg=C["bg_panel"])
             f.pack(fill="x", padx=20, pady=2)
@@ -355,8 +375,9 @@ class PanelResumen(tk.Frame):
             tk.Label(f, text=str(val), bg=C["bg_panel"],
                      fg=color, font=("Consolas", 12, "bold")).pack(side="left")
 
-        stat_row("Total tokens:", total, C["col_NUM"])
-        stat_row("Estado:", "ANÁLISIS EXITOSO  ✔", C["ok_green"])
+        stat_row("Total tokens:",  total,      C["col_NUM"])
+        stat_row("Total errores:", n_err,      color_err)
+        stat_row("Estado:",        estado_txt, estado_col)
 
         tk.Frame(self.inner, height=1, bg=C["border"]).pack(fill="x", padx=20, pady=8)
 
@@ -394,6 +415,27 @@ class PanelResumen(tk.Frame):
                      fg=color, font=("Consolas", 11, "bold"),
                      width=4, anchor="e").pack(side="left")
 
+        # ── Resumen de errores ────────────────────────────────
+        if errores:
+            tk.Frame(self.inner, height=1, bg=C["border"]).pack(
+                fill="x", padx=20, pady=8)
+            tk.Label(self.inner, text="Errores detectados:",
+                     bg=C["bg_panel"], fg=C["col_ERROR"],
+                     font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=20, pady=(0, 4))
+
+            for err in errores:
+                f = tk.Frame(self.inner, bg=C["bg_panel"])
+                f.pack(fill="x", padx=24, pady=1)
+                tk.Label(f, text=f"Línea {err.linea:>3}, Col {err.columna:>3} │",
+                         bg=C["bg_panel"], fg=C["fg_dim"],
+                         font=("Consolas", 10)).pack(side="left")
+                tk.Label(f, text=f" '{err.lexema}'",
+                         bg=C["bg_panel"], fg=C["col_OPR"],
+                         font=("Consolas", 10, "bold")).pack(side="left")
+                tk.Label(f, text=f"  {err.mensaje}",
+                         bg=C["bg_panel"], fg=C["col_ERROR"],
+                         font=("Segoe UI", 9)).pack(side="left")
+
         self.inner.update_idletasks()
         self._on_configure()
 
@@ -412,7 +454,8 @@ class AplicacionFISIO(tk.Tk):
         super().__init__()
         self.C = COLORES_GUI
         self._archivo_actual: str | None = None
-        self._tokens = []
+        self._tokens  = []
+        self._errores = []
         self._configurar_ventana()
         self._construir_ui()
         self._cargar_ejemplo("MRU completo")
@@ -564,6 +607,7 @@ class AplicacionFISIO(tk.Tk):
 
         self._sv_archivo = tk.StringVar(value="Sin archivo")
         self._sv_tokens  = tk.StringVar(value="Tokens: —")
+        self._sv_errores = tk.StringVar(value="Errores: —")
         self._sv_estado  = tk.StringVar(value="Listo")
 
         def lbl(parent, var, fg=None, side="left", padx=8):
@@ -575,6 +619,8 @@ class AplicacionFISIO(tk.Tk):
         lbl(bar, self._sv_archivo, fg=C["fg_dim"])
         tk.Frame(bar, width=1, bg=C["border"]).pack(side="left", fill="y", pady=4)
         lbl(bar, self._sv_tokens, fg=C["col_NUM"])
+        tk.Frame(bar, width=1, bg=C["border"]).pack(side="left", fill="y", pady=4)
+        lbl(bar, self._sv_errores, fg=C["col_ERROR"])
         lbl(bar, self._sv_estado, fg=C["accent"], side="right", padx=12)
 
     # ── Acciones ──────────────────────────────────────────────
@@ -834,16 +880,23 @@ class AplicacionFISIO(tk.Tk):
             return
 
         lex = Lexer(codigo)
-        self._tokens, _ = lex.analizar()
+        self._tokens, self._errores = lex.analizar()
 
         self.tabla_tokens.poblar(self._tokens)
-        self.panel_resumen.poblar(self._tokens)
-        self.editor.resaltar(self._tokens)
+        self.panel_resumen.poblar(self._tokens, self._errores)
+        self.editor.resaltar(self._tokens, self._errores)
 
         n_tok = len(self._tokens)
+        n_err = len(self._errores)
         self._sv_tokens.set(f"Tokens: {n_tok}")
-        self._sv_estado.set("✔ Análisis exitoso")
-        self.notebook.select(0)
+        self._sv_errores.set(f"Errores: {n_err}")
+
+        if n_err == 0:
+            self._sv_estado.set("✔ Análisis exitoso")
+            self.notebook.select(0)
+        else:
+            self._sv_estado.set(f"✖ {n_err} error(es) encontrado(s)")
+            self.notebook.select(1)
 
     def _abrir_archivo(self):
         ruta = filedialog.askopenfilename(
@@ -895,6 +948,7 @@ class AplicacionFISIO(tk.Tk):
         self._limpiar_resultados()
         self._sv_archivo.set("Sin archivo")
         self._sv_tokens.set("Tokens: —")
+        self._sv_errores.set("Errores: —")
         self._sv_estado.set("Listo")
         self.title("FISIO — Analizador Léxico")
 
@@ -902,6 +956,7 @@ class AplicacionFISIO(tk.Tk):
         self.tabla_tokens.limpiar()
         self.panel_resumen.limpiar()
         self._sv_tokens.set("Tokens: —")
+        self._sv_errores.set("Errores: —")
         self._sv_estado.set("Listo")
 
     def _acerca_de(self):
