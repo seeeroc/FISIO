@@ -79,7 +79,7 @@ class NodoIdentificador(NodoAST):
 @dataclass(frozen=True, slots=True)
 class NodoAccesoArreglo(NodoAST):
     identificador: Token
-    indice: NodoAST
+    indice: Token
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,7 +367,9 @@ class Parser:
             identificador = self._avanzar()
 
             if self._coincidir_lexema("["):
-                indice = self.parse_expresion()
+                indice = self._consumir_numero(
+                    "Se esperaba NUM como indice del arreglo"
+                )
                 if indice is None:
                     return None
 
@@ -432,6 +434,13 @@ class Parser:
 
     def _consumir_var_fisica(self, mensaje: str) -> Optional[Token]:
         if self._check_var_fisica():
+            return self._avanzar()
+
+        self._error_actual(mensaje)
+        return None
+
+    def _consumir_numero(self, mensaje: str) -> Optional[Token]:
+        if self._check_tipo(TipoToken.NUM):
             return self._avanzar()
 
         self._error_actual(mensaje)

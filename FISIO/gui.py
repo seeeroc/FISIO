@@ -560,7 +560,7 @@ class PanelSintactico(tk.Frame):
         nombre = nodo.__class__.__name__
         detalles: list[str] = []
 
-        for attr in ("nombre", "identificador", "variable", "operador", "token"):
+        for attr in ("nombre", "identificador", "variable", "operador", "token", "indice"):
             token = getattr(nodo, attr, None)
             if token is not None:
                 detalles.append(f"{attr}='{token.lexema}'")
@@ -577,7 +577,7 @@ class PanelSintactico(tk.Frame):
                 for valor in valores:
                     lineas.extend(self._formatear_ast(valor, nivel + 2))
 
-        for attr in ("lugar", "expresion", "indice", "izquierda", "derecha"):
+        for attr in ("lugar", "expresion", "izquierda", "derecha"):
             valor = getattr(nodo, attr, None)
             if valor is not None:
                 lineas.append(f"{indent}  {attr}:")
