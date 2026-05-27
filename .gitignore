@@ -1,2 +1,4 @@
 FISIO/__pycache__/lexer.cpython-313.pyc
 *.pyc
+FISIO/__pycache__/
+FISIO/__pycache__/*.pyc
