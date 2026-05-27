@@ -39,6 +39,8 @@ PALABRAS_RESERVADAS: dict[str, tuple[str, str]] = {
     "tiempo": (TipoToken.PR, "PR_16"),
     "altura": (TipoToken.PR, "PR_17"),
     "alcance": (TipoToken.PR, "PR_18"),
+    "Inicio": (TipoToken.PR, "PR_19"),
+    "Fin": (TipoToken.PR, "PR_20"),
 }
 
 OPERADORES_MATEMATICOS: dict[str, tuple[str, str]] = {

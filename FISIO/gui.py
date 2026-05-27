@@ -13,6 +13,7 @@ import os
 import sys
 
 from lexer       import Lexer
+from parser      import Parser
 from token_types import (
     TipoToken,
     PALABRAS_RESERVADAS,
@@ -204,8 +205,13 @@ class EditorCodigo(tk.Frame):
 
         # Subrayar lexemas de error
         for err in errores:
+            lexema = getattr(err, "lexema", None)
+            if lexema is None and hasattr(err, "token"):
+                lexema = err.token.lexema
+            if not lexema:
+                continue
             ini = f"{err.linea}.{err.columna - 1}"
-            fin = f"{err.linea}.{err.columna - 1 + len(err.lexema)}"
+            fin = f"{err.linea}.{err.columna - 1 + len(lexema)}"
             self.texto.tag_add("ERROR", ini, fin)
 
     def get_codigo(self) -> str:
@@ -473,6 +479,120 @@ class PanelResumen(tk.Frame):
 # ─────────────────────────────────────────────────────────────
 #  WIDGET: PANEL ALFABETO / ESPECIFICACIÓN
 # ─────────────────────────────────────────────────────────────
+class PanelSintactico(tk.Frame):
+    """Muestra el resultado del parser y una vista textual del AST."""
+
+    def __init__(self, parent, colores: dict, **kwargs):
+        super().__init__(parent, bg=colores["bg_panel"], **kwargs)
+        self.colores = colores
+        self._construir()
+
+    def _construir(self):
+        C = self.colores
+
+        frame = tk.Frame(self, bg=C["bg_panel"])
+        frame.pack(fill="both", expand=True)
+
+        self.texto = tk.Text(
+            frame,
+            wrap="none",
+            bg=C["bg_panel"],
+            fg=C["fg_main"],
+            insertbackground=C["accent"],
+            selectbackground=C["border"],
+            font=("Consolas", 10),
+            bd=0,
+            padx=14,
+            pady=12,
+            relief="flat",
+            state="disabled",
+        )
+        sb_y = ttk.Scrollbar(frame, orient="vertical", command=self.texto.yview)
+        sb_x = ttk.Scrollbar(frame, orient="horizontal", command=self.texto.xview)
+        self.texto.configure(yscrollcommand=sb_y.set, xscrollcommand=sb_x.set)
+
+        sb_y.pack(side="right", fill="y")
+        sb_x.pack(side="bottom", fill="x")
+        self.texto.pack(side="left", fill="both", expand=True)
+
+        self.texto.tag_configure("titulo", foreground=C["accent"], font=("Consolas", 11, "bold"))
+        self.texto.tag_configure("ok", foreground=C["ok_green"], font=("Consolas", 10, "bold"))
+        self.texto.tag_configure("error", foreground=C["col_ERROR"])
+        self.texto.tag_configure("dim", foreground=C["fg_dim"])
+
+    def poblar(self, ast, errores: list):
+        self.texto.config(state="normal")
+        self.texto.delete("1.0", "end")
+
+        self.texto.insert("end", "ANALISIS SINTACTICO\n", "titulo")
+        self.texto.insert("end", "\n")
+
+        if errores:
+            self.texto.insert("end", f"CON ERRORES ({len(errores)})\n\n", "error")
+            self.texto.insert("end", "Errores detectados:\n", "titulo")
+            for err in errores:
+                lexema = self._lexema_error(err)
+                self.texto.insert(
+                    "end",
+                    f"  Linea {err.linea:>3}, Col {err.columna:>3} | '{lexema}' | {err.mensaje}\n",
+                    "error",
+                )
+            self.texto.insert("end", "\nAST parcial:\n", "titulo")
+        else:
+            self.texto.insert("end", "ANALISIS EXITOSO\n\n", "ok")
+            self.texto.insert("end", "AST:\n", "titulo")
+
+        for linea in self._formatear_ast(ast):
+            self.texto.insert("end", f"{linea}\n", "dim")
+
+        self.texto.config(state="disabled")
+
+    def limpiar(self):
+        self.texto.config(state="normal")
+        self.texto.delete("1.0", "end")
+        self.texto.config(state="disabled")
+
+    def _formatear_ast(self, nodo, nivel: int = 0) -> list[str]:
+        if nodo is None:
+            return ["<sin AST>"]
+
+        indent = "  " * nivel
+        nombre = nodo.__class__.__name__
+        detalles: list[str] = []
+
+        for attr in ("nombre", "identificador", "variable", "operador", "token"):
+            token = getattr(nodo, attr, None)
+            if token is not None:
+                detalles.append(f"{attr}='{token.lexema}'")
+
+        encabezado = f"{indent}{nombre}"
+        if detalles:
+            encabezado += " (" + ", ".join(detalles) + ")"
+
+        lineas = [encabezado]
+        for attr in ("sentencias", "argumentos"):
+            valores = getattr(nodo, attr, None)
+            if valores:
+                lineas.append(f"{indent}  {attr}:")
+                for valor in valores:
+                    lineas.extend(self._formatear_ast(valor, nivel + 2))
+
+        for attr in ("lugar", "expresion", "indice", "izquierda", "derecha"):
+            valor = getattr(nodo, attr, None)
+            if valor is not None:
+                lineas.append(f"{indent}  {attr}:")
+                lineas.extend(self._formatear_ast(valor, nivel + 2))
+
+        return lineas
+
+    @staticmethod
+    def _lexema_error(err) -> str:
+        lexema = getattr(err, "lexema", None)
+        if lexema is None and hasattr(err, "token"):
+            lexema = err.token.lexema
+        return lexema or "EOF"
+
+
 class PanelAlfabeto(tk.Frame):
     """Muestra la especificación del alfabeto y tokens del lenguaje FISIO."""
 
@@ -692,13 +812,18 @@ class AplicacionFISIO(tk.Tk):
         self._archivo_actual: str | None = None
         self._tokens  = []
         self._errores = []
+        self._ast = None
+        self._errores_sintacticos = []
+        self._lexico_realizado = False
+        self._codigo_analizado_lexico: str | None = None
+        self._btn_sintactico: tk.Button | None = None
         self._configurar_ventana()
         self._construir_ui()
         self._cargar_ejemplo("MRU completo")
 
     # ── Configuración de la ventana ───────────────────────────
     def _configurar_ventana(self):
-        self.title("FISIO — Analizador Léxico")
+        self.title("FISIO — Analizador Léxico y Sintáctico")
         self.geometry("1280x780")
         self.minsize(900, 600)
         self.configure(bg=self.C["bg_main"])
@@ -713,6 +838,15 @@ class AplicacionFISIO(tk.Tk):
         self._construir_toolbar()
         self._construir_cuerpo()
         self._construir_statusbar()
+        self.bind("<F5>", lambda _event: self._analizar_lexico())
+        self.bind("<F6>", lambda _event: self._analizar_sintactico())
+
+    def _set_sintactico_disponible(self, disponible: bool):
+        if self._btn_sintactico is None:
+            return
+
+        estado = "normal" if disponible else "disabled"
+        self._btn_sintactico.config(state=estado, disabledforeground=self.C["fg_dim"])
 
     # ── Toolbar ───────────────────────────────────────────────
     def _construir_toolbar(self):
@@ -746,8 +880,11 @@ class AplicacionFISIO(tk.Tk):
 
         tk.Frame(bar, width=1, bg=C["border"], height=28).pack(side="left", padx=6, pady=8)
 
-        btn(bar, "Analizar  [F5]", self._analizar,
+        btn(bar, "Léxico  [F5]", self._analizar_lexico,
             color_fg=C["bg_main"], color_bg=C["accent"], emoji="▶")
+        self._btn_sintactico = btn(bar, "Sintáctico  [F6]", self._analizar_sintactico,
+            color_fg=C["fg_main"], color_bg=C["bg_toolbar"], emoji="✓")
+        self._set_sintactico_disponible(False)
 
         tk.Frame(bar, width=1, bg=C["border"], height=28).pack(side="left", padx=6, pady=8)
 
@@ -770,7 +907,7 @@ class AplicacionFISIO(tk.Tk):
         )
         ejm.pack(side="left", padx=4)
 
-        tk.Label(bar, text="FISIO  Analizador Léxico",
+        tk.Label(bar, text="FISIO  Analizador Léxico y Sintáctico",
                  bg=C["bg_toolbar"], fg=C["accent"],
                  font=("Segoe UI", 12, "bold")).pack(side="right", padx=16)
 
@@ -797,6 +934,7 @@ class AplicacionFISIO(tk.Tk):
 
         self.editor = EditorCodigo(izq, C)
         self.editor.pack(fill="both", expand=True)
+        self.editor.texto.bind("<KeyRelease>", self._on_codigo_modificado, add="+")
 
         # Panel derecho: Notebook
         der = tk.Frame(paned, bg=C["bg_panel"])
@@ -833,6 +971,12 @@ class AplicacionFISIO(tk.Tk):
         self.panel_resumen = PanelResumen(frame_res, C)
         self.panel_resumen.pack(fill="both", expand=True)
 
+        # Pestaña Sintaxis
+        frame_sin = tk.Frame(self.notebook, bg=C["bg_panel"])
+        self.notebook.add(frame_sin, text="  Sintaxis  ")
+        self.panel_sintactico = PanelSintactico(frame_sin, C)
+        self.panel_sintactico.pack(fill="both", expand=True)
+
         # Pestaña Alfabeto
         frame_alf = tk.Frame(self.notebook, bg=C["bg_panel"])
         self.notebook.add(frame_alf, text="  📘  Alfabeto  ")
@@ -850,6 +994,7 @@ class AplicacionFISIO(tk.Tk):
         self._sv_archivo = tk.StringVar(value="Sin archivo")
         self._sv_tokens  = tk.StringVar(value="Tokens: —")
         self._sv_errores = tk.StringVar(value="Errores: —")
+        self._sv_sintaxis = tk.StringVar(value="Sintaxis: —")
         self._sv_estado  = tk.StringVar(value="Listo")
 
         def lbl(parent, var, fg=None, side="left", padx=8):
@@ -863,14 +1008,43 @@ class AplicacionFISIO(tk.Tk):
         lbl(bar, self._sv_tokens, fg=C["col_NUM"])
         tk.Frame(bar, width=1, bg=C["border"]).pack(side="left", fill="y", pady=4)
         lbl(bar, self._sv_errores, fg=C["col_ERROR"])
+        tk.Frame(bar, width=1, bg=C["border"]).pack(side="left", fill="y", pady=4)
+        lbl(bar, self._sv_sintaxis, fg=C["accent"])
         lbl(bar, self._sv_estado, fg=C["accent"], side="right", padx=12)
 
     # ── Acciones ──────────────────────────────────────────────
+    def _on_codigo_modificado(self, _event=None):
+        if self._lexico_realizado:
+            self._invalidar_analisis_por_cambio()
+
+    def _invalidar_analisis_por_cambio(self):
+        self._tokens = []
+        self._errores = []
+        self._ast = None
+        self._errores_sintacticos = []
+        self._lexico_realizado = False
+        self._codigo_analizado_lexico = None
+
+        self.tabla_tokens.limpiar()
+        self.panel_resumen.limpiar()
+        self.panel_sintactico.limpiar()
+        self.editor.resaltar([], [])
+        self._set_sintactico_disponible(False)
+
+        if hasattr(self, "_sv_tokens"):
+            self._sv_tokens.set("Tokens: —")
+            self._sv_errores.set("Errores: —")
+            self._sv_sintaxis.set("Sintaxis: —")
+            self._sv_estado.set("Codigo modificado; ejecuta analisis lexico")
+
     def _mostrar_alfabeto_tab(self):
         """Muestra la pestaña con la especificación del alfabeto."""
-        self.notebook.select(2)
+        self.notebook.select(3)
 
     def _analizar(self):
+        self._analizar_lexico()
+
+    def _analizar_lexico(self):
         codigo = self.editor.get_codigo()
         if not codigo.strip():
             messagebox.showwarning(
@@ -881,6 +1055,11 @@ class AplicacionFISIO(tk.Tk):
 
         lex = Lexer(codigo)
         self._tokens, self._errores = lex.analizar()
+        self._ast = None
+        self._errores_sintacticos = []
+        self._lexico_realizado = True
+        self._codigo_analizado_lexico = codigo
+        self.panel_sintactico.limpiar()
 
         self.tabla_tokens.poblar(self._tokens)
         self.panel_resumen.poblar(self._tokens, self._errores)
@@ -890,13 +1069,57 @@ class AplicacionFISIO(tk.Tk):
         n_err = len(self._errores)
         self._sv_tokens.set(f"Tokens: {n_tok}")
         self._sv_errores.set(f"Errores: {n_err}")
+        self._sv_sintaxis.set("Sintaxis: —")
+        self._set_sintactico_disponible(n_err == 0)
 
         if n_err == 0:
-            self._sv_estado.set("✔ Análisis exitoso")
+            self._sv_estado.set("✓ Analisis lexico exitoso")
             self.notebook.select(0)
         else:
-            self._sv_estado.set(f"✖ {n_err} error(es) encontrado(s)")
+            self._sv_estado.set(f"✕ {n_err} error(es) lexicos")
             self.notebook.select(1)
+
+    def _analizar_sintactico(self):
+        codigo_actual = self.editor.get_codigo()
+
+        if not self._lexico_realizado:
+            messagebox.showwarning(
+                "Analisis lexico requerido",
+                "Primero ejecuta el analisis lexico antes del analisis sintactico."
+            )
+            return
+
+        if self._codigo_analizado_lexico != codigo_actual:
+            self._invalidar_analisis_por_cambio()
+            messagebox.showwarning(
+                "Codigo modificado",
+                "El codigo cambio despues del analisis lexico. Ejecuta de nuevo el analisis lexico."
+            )
+            return
+
+        if self._errores:
+            messagebox.showwarning(
+                "Errores lexicos",
+                "Corrige los errores lexicos antes de ejecutar el analisis sintactico."
+            )
+            self._set_sintactico_disponible(False)
+            return
+
+        parser = Parser(self._tokens)
+        self._ast, self._errores_sintacticos = parser.parse()
+
+        self.panel_sintactico.poblar(self._ast, self._errores_sintacticos)
+        self.editor.resaltar(self._tokens, self._errores_sintacticos)
+
+        n_err = len(self._errores_sintacticos)
+        self._sv_sintaxis.set(f"Sintaxis: {n_err} error(es)")
+
+        if n_err == 0:
+            self._sv_estado.set("✓ Analisis sintactico exitoso")
+        else:
+            self._sv_estado.set(f"✕ {n_err} error(es) sintacticos")
+
+        self.notebook.select(2)
 
     def _abrir_archivo(self):
         ruta = filedialog.askopenfilename(
@@ -949,14 +1172,25 @@ class AplicacionFISIO(tk.Tk):
         self._sv_archivo.set("Sin archivo")
         self._sv_tokens.set("Tokens: —")
         self._sv_errores.set("Errores: —")
+        self._sv_sintaxis.set("Sintaxis: —")
         self._sv_estado.set("Listo")
-        self.title("FISIO — Analizador Léxico")
+        self.title("FISIO — Analizador Léxico y Sintáctico")
 
     def _limpiar_resultados(self):
+        self._tokens = []
+        self._errores = []
+        self._ast = None
+        self._errores_sintacticos = []
+        self._lexico_realizado = False
+        self._codigo_analizado_lexico = None
         self.tabla_tokens.limpiar()
         self.panel_resumen.limpiar()
+        self.panel_sintactico.limpiar()
+        self.editor.resaltar([], [])
+        self._set_sintactico_disponible(False)
         self._sv_tokens.set("Tokens: —")
         self._sv_errores.set("Errores: —")
+        self._sv_sintaxis.set("Sintaxis: —")
         self._sv_estado.set("Listo")
 
     def _acerca_de(self):
