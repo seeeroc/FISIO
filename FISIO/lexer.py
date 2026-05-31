@@ -79,6 +79,16 @@ class Lexer:
             lambda char: self._es_letra(char) or char.isdigit()
         )
 
+        if self._hay_continuacion_mal_formada():
+            lexema += self._consumir_fragmento_mal_formado()
+            self._agregar_error(
+                lexema,
+                "Caracter fuera del alfabeto FISIO",
+                linea_inicio,
+                columna_inicio,
+            )
+            return
+
         if lexema in PALABRAS_RESERVADAS:
             tipo, id_tok = PALABRAS_RESERVADAS[lexema]
         else:
@@ -105,7 +115,7 @@ class Lexer:
         if self._actual() == ".":
             mal_formado = True
             lexema += self._consumir_fragmento_mal_formado()
-        elif self._es_letra(self._actual()):
+        elif self._hay_continuacion_mal_formada(punto_es_delimitador=False):
             mal_formado = True
             lexema += self._consumir_fragmento_mal_formado()
 
@@ -118,13 +128,15 @@ class Lexer:
             mal_formado = True
 
         if mal_formado:
-            self.errores.append(
-                ErrorLexico(
-                    lexema,
-                    "Numero mal formado",
-                    linea_inicio,
-                    columna_inicio,
-                )
+            mensaje = "Numero mal formado"
+            if self._contiene_caracter_fuera_alfabeto(lexema):
+                mensaje = "Caracter fuera del alfabeto FISIO"
+
+            self._agregar_error(
+                lexema,
+                mensaje,
+                linea_inicio,
+                columna_inicio,
             )
             return
 
@@ -136,16 +148,14 @@ class Lexer:
         lexema = self._avanzar()
         lexema += self._consumir_mientras(str.isdigit)
 
-        if self._actual() == "." or self._es_letra(self._actual()):
+        if self._hay_continuacion_mal_formada(punto_es_delimitador=False):
             lexema += self._consumir_fragmento_mal_formado()
 
-        self.errores.append(
-            ErrorLexico(
-                lexema,
-                "Numero decimal sin parte entera",
-                linea_inicio,
-                columna_inicio,
-            )
+        self._agregar_error(
+            lexema,
+            "Numero decimal sin parte entera",
+            linea_inicio,
+            columna_inicio,
         )
 
     def _leer_operador_relacional(self) -> None:
@@ -168,30 +178,45 @@ class Lexer:
             self._avanzar()
             return
 
-        self.errores.append(
-            ErrorLexico(
-                actual,
-                "Operador relacional incompleto o invalido",
-                linea_inicio,
-                columna_inicio,
-            )
+        lexema = self._avanzar()
+        if self._hay_continuacion_mal_formada():
+            lexema += self._consumir_fragmento_mal_formado()
+
+        self._agregar_error(
+            lexema,
+            "Operador relacional incompleto o invalido",
+            linea_inicio,
+            columna_inicio,
         )
-        self._avanzar()
 
     def _leer_caracter_invalido(self) -> None:
         linea_inicio = self.linea
         columna_inicio = self.columna
         lexema = self._avanzar()
+        lexema += self._consumir_fragmento_mal_formado()
         mensaje = "Caracter fuera del alfabeto FISIO"
 
-        if lexema in ALFABETO_VALIDO:
+        if not self._contiene_caracter_fuera_alfabeto(lexema):
             mensaje = "Caracter no reconocido en este contexto"
 
-        self.errores.append(ErrorLexico(lexema, mensaje, linea_inicio, columna_inicio))
+        self._agregar_error(lexema, mensaje, linea_inicio, columna_inicio)
+
+    def _agregar_error(
+        self,
+        lexema: str,
+        mensaje: str,
+        linea: int,
+        columna: int,
+    ) -> None:
+        self.errores.append(ErrorLexico(lexema, mensaje, linea, columna))
+        self.tokens.append(Token(lexema, TipoToken.ERROR, "ERROR", linea, columna))
 
     def _consumir_fragmento_mal_formado(self) -> str:
         return self._consumir_mientras(
-            lambda char: self._es_letra(char) or char.isdigit() or char == "."
+            lambda char: not self._es_delimitador_lexema(
+                char,
+                punto_es_delimitador=False,
+            )
         )
 
     def _consumir_mientras(self, condicion) -> str:
@@ -203,6 +228,39 @@ class Lexer:
     def _agregar_token_actual(self, definicion: tuple[str, str]) -> None:
         tipo, id_tok = definicion
         self.tokens.append(Token(self._actual(), tipo, id_tok, self.linea, self.columna))
+
+    def _contiene_caracter_fuera_alfabeto(self, lexema: str) -> bool:
+        return any(char not in ALFABETO_VALIDO for char in lexema)
+
+    def _hay_continuacion_mal_formada(
+        self,
+        *,
+        punto_es_delimitador: bool = True,
+    ) -> bool:
+        return not self._es_delimitador_lexema(
+            self._actual(),
+            punto_es_delimitador=punto_es_delimitador,
+        )
+
+    def _es_delimitador_lexema(
+        self,
+        char: str,
+        *,
+        punto_es_delimitador: bool = True,
+    ) -> bool:
+        if char == "\0" or char in " \t\r\n":
+            return True
+
+        if char in OPERADORES_MATEMATICOS or char in "=<>":
+            return True
+
+        if char in ":!":
+            return self._siguiente() == "="
+
+        if char in SIGNOS:
+            return punto_es_delimitador or char != "."
+
+        return False
 
     def _actual(self) -> str:
         if self._fin():

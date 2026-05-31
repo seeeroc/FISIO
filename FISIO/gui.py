@@ -300,6 +300,7 @@ class TablaTokens(tk.Frame):
             ("ERROR", "col_ERROR"),
         ]:
             self.tree.tag_configure(tipo, foreground=C[color])
+        self.tree.tag_configure("ERROR", foreground="#ffffff", background="#6b1f2b")
         self.tree.tag_configure("par",   background=C["bg_row_alt"])
         self.tree.tag_configure("impar", background=C["bg_panel"])
 
@@ -307,10 +308,11 @@ class TablaTokens(tk.Frame):
         self.tree.delete(*self.tree.get_children())
         for i, tok in enumerate(tokens):
             par = "par" if i % 2 == 0 else "impar"
+            tags = ("ERROR",) if tok.tipo == TipoToken.ERROR else (tok.tipo, par)
             self.tree.insert("", "end",
                 values=(tok.lexema, tok.tipo, tok.id_tok,
                         tok.linea, tok.columna),
-                tags=(tok.tipo, par),
+                tags=tags,
             )
 
     def limpiar(self):
@@ -330,6 +332,7 @@ class PanelResumen(tk.Frame):
         ("SIG", "Signos",              "col_SIG"),
         ("ID",  "Identificadores",     "col_ID"),
         ("NUM", "Números",             "col_NUM"),
+        ("ERROR", "Errores léxicos",   "col_ERROR"),
     ]
 
     def __init__(self, parent, colores: dict, **kwargs):
